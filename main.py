@@ -1,4 +1,6 @@
 import simpy
+import math
+from heapq import *
 
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
@@ -70,12 +72,12 @@ class Node():
         msg.update_follow_up_node(follow_up_node)
 
 
-
 class Arc():
-    def __init__(self, environment, fwd_node, bck_node):
+    def __init__(self, environment, source_node, target_node, weight):
         self.env = environment
-        self.fwd_node = fwd_node
-        self.bck_node = bck_node
+        self.source = source_node
+        self.target = target_node
+        self.weight = weight
 
         # returns queue for each destination
         bck_id = bck_node.id
@@ -140,6 +142,7 @@ class Queue(deque):
     def popleft(self):
         service_time = normalvariate(self.mean, self.dev)
         return service_time, super().popleft()
+
 
 def generate_graph(env):
     A = Node(env, 'A')
