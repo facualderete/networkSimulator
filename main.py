@@ -1,6 +1,5 @@
 import simpy
-import math
-from heapq import *
+from math import *
 
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
