@@ -31,15 +31,16 @@ class Graph():
         self.adjacency_map[node] = []
 
 
-    # Dijkstra pseudocode
-    # initialize distance to self to 0
-    # initialize distance to every other node to INF
-    # insert self with priority (weight) 0 into PQ
-    # while PQ not empty:
-    #   pick next node in PQ
-    #   for each edge in node
-    #       if distance from node through edge is smaller than the one stored:
-    #           update and insert node-pointed-to into PQ
+    """ Dijkstra pseudocode
+    initialize distance to self to 0
+    initialize distance to every other node to INF
+    insert self with priority (weight) 0 into PQ
+    while PQ not empty:
+      pick next node in PQ
+      for each edge in node
+          if distance from node through edge is smaller than the one stored:
+              update and insert node-pointed-to into PQ
+    """
     def dijkstra(self, node):
         distance_to = {}
         arc_to = {}
