@@ -93,7 +93,8 @@ class Message(object):
         return self.env.now - self.timestamp
 
     def __str__(self):
-        return '<Message (' + str(self.origin) + \
+        return '<Message 0x' + format(self.__hash__() % 0x10000, '04X') + \
+               ' (' + str(self.origin) + \
                ' -> ' + str(self.destination) + \
                ') {created: ' + str(self.timestamp) + \
                ', alive: ' + str(self.time_in_transit()) + \
