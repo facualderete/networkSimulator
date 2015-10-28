@@ -18,27 +18,29 @@ def normal_var_gen(var_mu, var_sigma):
 
 
 class MessageRouter(object):
-    def __init__(self, node, queues):
+    def __init__(self, env, node, queues):
         self.queues = queues
         self.node = node
+        self.env = env
 
     def set_route(self, target, queue):
         self.queues[target] = queue
 
     def route(self, msg):
         if msg.destination == self.node:
-            print('DESTROY', msg, ' in ', self.node, ' at ', msg.env.now)
+            print('DESTROY', msg, ' in ', self.node, ' at ', self.env.now)
             return
         next_queue = self.queues.get(msg.destination, None)
         if next_queue is None:
             raise Exception("Se cago todo error")
-        print('ROUTE', msg, ' from ', self.node, ' to ', next_queue.next_router.node, ' at ', msg.env.now)
+        print('ROUTE', msg, ' from ', self.node, ' to ', next_queue.next_node, ' at ', self.env.now)
         next_queue.enqueue(msg)
 
 
 class MessageQueue(object):
-    def __init__(self, env, next_router, service_times):
-        self.next_router = next_router
+    def __init__(self, env, next_node, next_node_router, service_times):
+        self.next_node = next_node
+        self.next_node_router = next_node_router
         self.queue = deque([])
         self.env = env
         self.service_times = service_times
@@ -53,8 +55,8 @@ class MessageQueue(object):
             service_time = next(self.service_times)
             yield self.env.timeout(service_time)
             msg = self.queue.popleft()
-            print('TRANSIT', msg, ' to ', self.next_router.node, ' at ', self.env.now, ' in ', service_time)
-            self.next_router.route(msg)
+            print('TRANSIT', msg, ' to ', self.next_node, ' at ', self.env.now, ' in ', service_time)
+            self.next_node_router.route(msg)
 
 
 class MessageSpawner(object):
@@ -71,21 +73,15 @@ class MessageSpawner(object):
     def _trigger(self, destination, spawn_times):
         while self.env.now < SIMULATION_TIME:
             yield self.env.timeout(next(spawn_times))
-            msg = self._generate_msg(destination)
+            msg = Message(self.env, self.origin, destination)
             msg.init_timestamp()
             print('CREATE', msg)
-            self._send_msg(msg)
-
-    def _send_msg(self, msg):
-        self.origin_router.route(msg)
-
-    def _generate_msg(self, destination):
-        return Message(self.env, self.origin, destination)
+            self.origin_router.route(msg)
 
 
 class Message(object):
-    def __init__(self, environment, origin, destination):
-        self.env = environment
+    def __init__(self, env, origin, destination):
+        self.env = env
         self.timestamp = None
         self.origin = origin
         self.destination = destination
@@ -110,13 +106,13 @@ class NetworkGraph(nx.DiGraph):
 
     def add_network_node(self, name, demand):
         demand = dict(map(lambda kv: (kv[0], exponential_var_gen(kv[1])), demand.items()))
-        router = MessageRouter(name, {})
+        router = MessageRouter(self.env, name, {})
         spawner = MessageSpawner(self.env, name, router, demand)
         self.add_node(name, router=router, spawner=spawner)
 
     def add_network_edge(self, source, destination, mu, sigma):
         destination_router = self.node[destination]['router']
-        queue = MessageQueue(self.env, destination_router, normal_var_gen(mu, sigma))
+        queue = MessageQueue(self.env, destination, destination_router, normal_var_gen(mu, sigma))
         self.add_edge(source, destination, queue=queue, mu=mu, sigma=sigma)
 
     def add_network_double_edge(self, u, v, mu, sigma):
@@ -153,7 +149,7 @@ def create_graph(env):
 def print_routing_status(graph):
     for node, attr in graph.node.items():
         for target, queue in attr['router'].queues.items():
-            print(node, target, queue.next_router.node)
+            print(node, target, queue.next_node)
 
 
 if __name__ == '__main__':
