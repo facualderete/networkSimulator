@@ -9,12 +9,12 @@ SIMULATION_TIME = 100
 
 def exponential_var_gen(var_lambda):
     while True:
-        yield int(expovariate(var_lambda))
+        yield int(round(expovariate(var_lambda)))
 
 
 def normal_var_gen(var_mu, var_sigma):
     while True:
-        yield int(normalvariate(var_mu, var_sigma))
+        yield int(round(normalvariate(var_mu, var_sigma)))
 
 
 class MessageRouter(object):
@@ -86,13 +86,12 @@ class MessageSpawner(object):
 class Message(object):
     def __init__(self, environment, origin, destination):
         self.env = environment
-        self.origin_timestamp = None
         self.timestamp = None
         self.origin = origin
         self.destination = destination
 
     def init_timestamp(self):
-        self.timestamp = self.origin_timestamp = self.env.now
+        self.timestamp = self.env.now
 
     def time_in_transit(self):
         return self.timestamp - self.env.now
@@ -120,6 +119,10 @@ class NetworkGraph(nx.DiGraph):
         queue = MessageQueue(self.env, destination_router, normal_var_gen(mu, sigma))
         self.add_edge(source, destination, queue=queue, mu=mu, sigma=sigma)
 
+    def add_network_double_edge(self, u, v, mu, sigma):
+        self.add_network_edge(u, v, mu, sigma)
+        self.add_network_edge(v, u, mu, sigma)
+
     def update_routing(self, weight):
         results = nx.shortest_path(self, weight=weight)
         for node, paths in results.items():
@@ -141,13 +144,11 @@ def create_graph(env):
     new_graph.add_network_node('A', {'B': 1.0/100})
     new_graph.add_network_node('B', {'A': 1.0/100})
     new_graph.add_network_node('C', {})
-    new_graph.add_network_edge('A', 'B', 50, 5)
-    new_graph.add_network_edge('B', 'A', 50, 5)
-    # new_graph.add_network_edge('A', 'C', 4, 1)
-    # new_graph.add_network_edge('C', 'A', 4, 1)
-    # new_graph.add_network_edge('B', 'C', 4, 1)
-    # new_graph.add_network_edge('C', 'B', 4, 1)
+    new_graph.add_network_double_edge('A', 'B', 50, 5)
+    new_graph.add_network_double_edge('A', 'C', 10, 1)
+    new_graph.add_network_double_edge('B', 'C', 10, 1)
     return new_graph
+
 
 def print_routing_status(graph):
     for node, attr in graph.node.items():
