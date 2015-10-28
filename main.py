@@ -28,12 +28,12 @@ class MessageRouter(object):
 
     def route(self, msg):
         if msg.destination == self.node:
-            print('DESTROY', msg, ' in ', self.node, ' at ', self.env.now)
+            print('DESTROY', msg)
             return
         next_queue = self.queues.get(msg.destination, None)
         if next_queue is None:
             raise Exception("Se cago todo error")
-        print('ROUTE', msg, ' from ', self.node, ' to ', next_queue.next_node, ' at ', self.env.now)
+        print('ROUTE', msg, ' (' + self.node + ' -> ' + next_queue.next_node + ')')
         next_queue.enqueue(msg)
 
 
@@ -55,7 +55,7 @@ class MessageQueue(object):
             service_time = next(self.service_times)
             yield self.env.timeout(service_time)
             msg = self.queue.popleft()
-            print('TRANSIT', msg, ' to ', self.next_node, ' at ', self.env.now, ' in ', service_time)
+            print('TRANSIT', msg, ' (-> ' + self.next_node + ')', '{service_time: ' + str(service_time) + '}')
             self.next_node_router.route(msg)
 
 
@@ -90,13 +90,15 @@ class Message(object):
         self.timestamp = self.env.now
 
     def time_in_transit(self):
-        return self.timestamp - self.env.now
+        return self.env.now - self.timestamp
 
     def __str__(self):
         return '<Message (' + str(self.origin) + \
                ' -> ' + str(self.destination) + \
-               ') created at ' + str(self.timestamp) + \
-               '>'
+               ') {created: ' + str(self.timestamp) + \
+               ', alive: ' + str(self.time_in_transit()) + \
+               ', now: ' + str(self.env.now) + \
+               '}>'
 
 
 class NetworkGraph(nx.DiGraph):
