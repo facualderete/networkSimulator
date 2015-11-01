@@ -3,9 +3,12 @@ import simpy
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
 from matplotlib import pyplot as plt
+import numpy as np
 
-SIMULATION_TIME = 100
+SIMULATION_TIME = 1000
 
+pkt_count = 0
+pkt_total = 0
 
 def exponential_var_gen(var_lambda):
     while True:
@@ -15,6 +18,11 @@ def exponential_var_gen(var_lambda):
 def normal_var_gen(var_mu, var_sigma):
     while True:
         yield int(round(normalvariate(var_mu, var_sigma)))
+
+
+def debug_print(*args):
+    #print(*args)
+    pass
 
 
 class MessageRouter(object):
@@ -28,12 +36,12 @@ class MessageRouter(object):
 
     def route(self, msg):
         if msg.destination == self.node:
-            print('DESTROY', msg)
+            msg.terminate()
             return
         next_queue = self.queues.get(msg.destination, None)
         if next_queue is None:
             raise Exception("Se cago todo error")
-        print('ROUTE', msg, ' (' + self.node + ' -> ' + next_queue.next_node + ')')
+        debug_print('ROUTE', msg, ' (' + self.node + ' -> ' + next_queue.next_node + ')')
         next_queue.enqueue(msg)
 
 
@@ -55,8 +63,11 @@ class MessageQueue(object):
             service_time = next(self.service_times)
             yield self.env.timeout(service_time)
             msg = self.queue.popleft()
-            print('TRANSIT', msg, ' (-> ' + self.next_node + ')', '{service_time: ' + str(service_time) + '}')
+            debug_print('TRANSIT', msg, ' (-> ' + self.next_node + ')', '{service_time: ' + str(service_time) + '}')
             self.next_node_router.route(msg)
+
+    def get_queued_messages(self):
+        return len(self.queue)
 
 
 class MessageSpawner(object):
@@ -74,8 +85,7 @@ class MessageSpawner(object):
         while self.env.now < SIMULATION_TIME:
             yield self.env.timeout(next(spawn_times))
             msg = Message(self.env, self.origin, destination)
-            msg.init_timestamp()
-            print('CREATE', msg)
+            msg.initialize()
             self.origin_router.route(msg)
 
 
@@ -86,8 +96,15 @@ class Message(object):
         self.origin = origin
         self.destination = destination
 
-    def init_timestamp(self):
+    def initialize(self):
         self.timestamp = self.env.now
+        debug_print('CREATE', self)
+
+    def terminate(self):
+        global pkt_count, pkt_total
+        pkt_count += 1
+        pkt_total += self.time_in_transit()
+        debug_print('DESTROY', self)
 
     def time_in_transit(self):
         return self.env.now - self.timestamp
@@ -122,6 +139,11 @@ class NetworkGraph(nx.DiGraph):
         self.add_network_edge(u, v, mu, sigma)
         self.add_network_edge(v, u, mu, sigma)
 
+    def update_times(self):
+        for (u, v) in self.edges():
+            attrs = self.edge[u][v]
+            attrs['wait_time'] = (attrs['queue'].get_queued_messages() + 1)*attrs['mu']
+
     def update_routing(self, weight):
         results = nx.shortest_path(self, weight=weight)
         for node, paths in results.items():
@@ -131,19 +153,28 @@ class NetworkGraph(nx.DiGraph):
                     next_node = path[1]
                     queue = self.edge[node][next_node]['queue']
                     router.set_route(target, queue)
-                    print(node, target, path)
+                    debug_print(node, target, path)
 
     def initialize_spawners(self):
         for node, attributes in self.node.items():
             attributes['spawner'].initialize()
 
+    def initialize(self, update_time):
+        simpy.events.Process(env, self._update_routing_events(update_time))
+
+    def _update_routing_events(self, update_time):
+        while self.env.now < SIMULATION_TIME:
+            yield self.env.timeout(update_time)
+            self.update_times()
+            self.update_routing('wait_time')
+            debug_print('UPDATE ROUTING')
 
 def create_graph(env):
     new_graph = NetworkGraph(env)
-    new_graph.add_network_node('A', {'B': 1.0/100})
-    new_graph.add_network_node('B', {'A': 1.0/100})
+    new_graph.add_network_node('A', {'B': 1.0/10})
+    new_graph.add_network_node('B', {'A': 1.0/10})
     new_graph.add_network_node('C', {})
-    new_graph.add_network_double_edge('A', 'B', 50, 5)
+    new_graph.add_network_double_edge('A', 'B', 25, 1)
     new_graph.add_network_double_edge('A', 'C', 10, 1)
     new_graph.add_network_double_edge('B', 'C', 10, 1)
     return new_graph
@@ -152,15 +183,49 @@ def create_graph(env):
 def print_routing_status(graph):
     for node, attr in graph.node.items():
         for target, queue in attr['router'].queues.items():
-            print(node, target, queue.next_node)
+            debug_print(node, target, queue.next_node)
 
 
-if __name__ == '__main__':
-    seed(42)
+def run(update_times, sim_time):
+    global env, pkt_count, pkt_total, SIMULATION_TIME
+    SIMULATION_TIME = sim_time
+    pkt_count = 0
+    pkt_total = 0
+    #seed(42)
     env = simpy.Environment()
     graph = create_graph(env)
-    graph.update_routing("mu")
+    graph.update_times()
+    graph.update_routing("wait_time")
+    if update_times is not None:
+        graph.initialize(update_times)
     print_routing_status(graph)
-    print(graph.node.items())
     graph.initialize_spawners()
     env.run()
+    return pkt_count, pkt_total, pkt_total/pkt_count
+
+
+def run_batch(t, n):
+    t_means = 0
+    for k in range(n):
+        count, total, mean = run(t, 20000)
+        t_means += mean
+    return t_means/n
+
+if __name__ == '__main__':
+    x = []
+    y = []
+    inf_mean = run_batch(None, 50)
+
+    for t in range(1, 800, 10):
+        t_mean = run_batch(t, 20)
+        x.append(t)
+        y.append(t_mean)
+        print(t, t_mean)
+
+    x = np.array(x)
+    y = np.array(y)
+    yinf = np.array([inf_mean]*len(x))
+    plt.plot(x, y, 'o', x, yinf)
+    plt.show()
+    print(inf_mean)
+
