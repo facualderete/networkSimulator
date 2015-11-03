@@ -21,8 +21,43 @@ def normal_var_gen(var_mu, var_sigma):
 
 
 def debug_print(*args):
-    #print(*args)
+    print(*args)
     pass
+
+class Statistics(object):
+    def __init__(self):
+        self.demand_matrix = {}
+        self.delay_matrix = {}
+        self.routing_path_matrix = {}
+        self.routing_amount_matrix = {}
+
+    def update_path_for(self, origin, destination, path):
+        self.routing_path_matrix[(origin, destination)] = path
+
+    def add_routing_amount_for(self, origin, destination):
+        if not (origin, destination) in self.routing_amount_matrix.keys():
+            self.routing_amount_matrix[(origin, destination)] = 0
+        self.routing_amount_matrix[(origin, destination)] += 1
+
+    def add_demand_count(self, origin, destination):
+        if not (origin, destination) in self.demand_matrix.keys():
+            self.demand_matrix[(origin, destination)] = 0
+        self.demand_matrix[(origin, destination)] += 1
+
+    def add_delay_count(self, origin, destination, delay):
+        if not (origin, destination) in self.delay_matrix.keys():
+            self.delay_matrix[(origin, destination)] = 0
+        self.delay_matrix[(origin, destination)] += delay
+
+    def print_demand_count(self):
+        for (origin, destination) in self.demand_matrix.keys():
+            print("DEMAND ", origin, " -> ", destination, " : ", self.demand_matrix[(origin, destination)])
+
+    def print_delay_count(self):
+        for (origin, destination) in self.delay_matrix.keys():
+            # imprime el promedio de lo que tarda um paquete en llegar de un punto a otro
+            # divide el total de tardanza de todos los paquetes por la cantidad de paquetes enviados
+            print("DELAY ", origin, " -> ", destination, " : ", self.delay_matrix[(origin, destination)] / self.demand_matrix[(origin, destination)])
 
 
 class MessageRouter(object):
@@ -71,11 +106,12 @@ class MessageQueue(object):
 
 
 class MessageSpawner(object):
-    def __init__(self, env, origin, origin_router, demand):
+    def __init__(self, env, statistics, origin, origin_router, demand):
         self.env = env
         self.origin = origin
         self.origin_router = origin_router
         self.demand = demand
+        self.statistics = statistics
 
     def initialize(self):
         for destination, spawn_times in self.demand.items():
@@ -84,14 +120,16 @@ class MessageSpawner(object):
     def _trigger(self, destination, spawn_times):
         while self.env.now < SIMULATION_TIME:
             yield self.env.timeout(next(spawn_times))
-            msg = Message(self.env, self.origin, destination)
+            msg = Message(self.env, self.statistics, self.origin, destination)
+            self.statistics.add_demand_count(self.origin, destination)
             msg.initialize()
             self.origin_router.route(msg)
 
 
 class Message(object):
-    def __init__(self, env, origin, destination):
+    def __init__(self, env, statistics, origin, destination):
         self.env = env
+        self.statistics = statistics
         self.timestamp = None
         self.origin = origin
         self.destination = destination
@@ -104,6 +142,7 @@ class Message(object):
         global pkt_count, pkt_total
         pkt_count += 1
         pkt_total += self.time_in_transit()
+        self.statistics.add_delay_count(self.origin, self.destination, self.time_in_transit())
         debug_print('DESTROY', self)
 
     def time_in_transit(self):
@@ -120,14 +159,15 @@ class Message(object):
 
 
 class NetworkGraph(nx.DiGraph):
-    def __init__(self, env, data = None, **attr):
+    def __init__(self, env, statistics, data = None, **attr):
         super(NetworkGraph, self).__init__(data, **attr)
         self.env = env
+        self.statistics = statistics
 
     def add_network_node(self, name, demand):
         demand = dict(map(lambda kv: (kv[0], exponential_var_gen(kv[1])), demand.items()))
         router = MessageRouter(self.env, name, {})
-        spawner = MessageSpawner(self.env, name, router, demand)
+        spawner = MessageSpawner(self.env, self.statistics, name, router, demand)
         self.add_node(name, router=router, spawner=spawner)
 
     def add_network_edge(self, source, destination, mu, sigma):
@@ -153,6 +193,9 @@ class NetworkGraph(nx.DiGraph):
                     next_node = path[1]
                     queue = self.edge[node][next_node]['queue']
                     router.set_route(target, queue)
+                    self.statistics.add_routing_amount_for(node, target)
+                    self.statistics.update_path_for(node, target, (node, next_node))
+                    plot_routing_table(self.statistics)
                     debug_print(node, target, path)
 
     def initialize_spawners(self):
@@ -169,8 +212,8 @@ class NetworkGraph(nx.DiGraph):
             self.update_routing('wait_time')
             debug_print('UPDATE ROUTING')
 
-def create_graph(env):
-    new_graph = NetworkGraph(env)
+def create_graph(env, statistics):
+    new_graph = NetworkGraph(env, statistics)
     new_graph.add_network_node('A', {'B': 1.0/10})
     new_graph.add_network_node('B', {'A': 1.0/10})
     new_graph.add_network_node('C', {})
@@ -179,6 +222,25 @@ def create_graph(env):
     new_graph.add_network_double_edge('B', 'C', 10, 1)
     return new_graph
 
+def plot_routing_table(statistics):
+    # plt.close()
+    columns = ('# refrescos', 'Origen - Destino', 'Por arista...')
+    rows = []
+    refresh = []
+    route = []
+    for (origin, destination) in statistics.routing_amount_matrix.keys():
+        rows.append((statistics.routing_amount_matrix[(origin, destination)],
+                     origin + " - " + destination,
+                    statistics.routing_path_matrix[(origin, destination)]
+                     ))
+        refresh.append(statistics.routing_amount_matrix[(origin, destination)])
+        route.append(statistics.routing_path_matrix[(origin, destination)])
+
+    plt.table(cellText=rows,
+              colLabels=columns,
+              loc='center')
+    # plt.draw()
+    # plt.show()
 
 def print_routing_status(graph):
     for node, attr in graph.node.items():
@@ -191,9 +253,12 @@ def run(update_times, sim_time):
     SIMULATION_TIME = sim_time
     pkt_count = 0
     pkt_total = 0
+
+    statistics = Statistics()
+
     #seed(42)
     env = simpy.Environment()
-    graph = create_graph(env)
+    graph = create_graph(env, statistics)
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
@@ -201,13 +266,15 @@ def run(update_times, sim_time):
     print_routing_status(graph)
     graph.initialize_spawners()
     env.run()
+    statistics.print_demand_count()
+    statistics.print_delay_count()
     return pkt_count, pkt_total, pkt_total/pkt_count
 
 
 def run_batch(t, n):
     t_means = 0
     for k in range(n):
-        count, total, mean = run(t, 20000)
+        count, total, mean = run(t, 2000) # esto decía 20000
         t_means += mean
     return t_means/n
 
@@ -216,7 +283,7 @@ if __name__ == '__main__':
     y = []
     inf_mean = run_batch(None, 50)
 
-    for t in range(1, 800, 10):
+    for t in range(1, 100, 10): # decia (1, 800, 10)
         t_mean = run_batch(t, 20)
         x.append(t)
         y.append(t_mean)
