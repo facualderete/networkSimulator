@@ -21,7 +21,7 @@ def normal_var_gen(var_mu, var_sigma):
 
 
 def debug_print(*args):
-    print(*args)
+    # print(*args)
     pass
 
 class Statistics(object):
@@ -195,7 +195,7 @@ class NetworkGraph(nx.DiGraph):
                     router.set_route(target, queue)
                     self.statistics.add_routing_amount_for(node, target)
                     self.statistics.update_path_for(node, target, (node, next_node))
-                    plot_routing_table(self.statistics)
+                    # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
 
     def initialize_spawners(self):
@@ -211,6 +211,74 @@ class NetworkGraph(nx.DiGraph):
             self.update_times()
             self.update_routing('wait_time')
             debug_print('UPDATE ROUTING')
+
+def create_big_graph(env, statistics):
+    new_graph = NetworkGraph(env, statistics)
+    new_graph.add_network_node('A', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('B', {'A': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('C', {'B': 1.0/10, 'A': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('D', {'B': 1.0/10, 'C': 1.0/10, 'A': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('E', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'A': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('F', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'A': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('G', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'A': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('H', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'A': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('I', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'A': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('J', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'A': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('K', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'A': 1.0/10, 'L': 1.0/10})
+    new_graph.add_network_node('L', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
+        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'A': 1.0/10})
+
+    new_graph.add_network_double_edge('A', 'B', 4, 1)
+    new_graph.add_network_double_edge('A', 'D', 7, 1)
+    new_graph.add_network_double_edge('A', 'C', 5, 1)
+    new_graph.add_network_double_edge('B', 'A', 8, 1)
+    new_graph.add_network_double_edge('B', 'G', 9, 1)
+    new_graph.add_network_double_edge('B', 'E', 15, 1)
+    new_graph.add_network_double_edge('C', 'A', 12, 1)
+    new_graph.add_network_double_edge('C', 'H', 6, 1)
+    new_graph.add_network_double_edge('C', 'G', 17, 1)
+    new_graph.add_network_double_edge('D', 'A', 6, 1)
+    new_graph.add_network_double_edge('D', 'E', 7, 1)
+    new_graph.add_network_double_edge('D', 'F', 7, 1)
+    new_graph.add_network_double_edge('D', 'H', 13, 1)
+    new_graph.add_network_double_edge('E', 'B', 21, 1)
+    new_graph.add_network_double_edge('E', 'D', 10, 1)
+    new_graph.add_network_double_edge('E', 'F', 6, 1)
+    new_graph.add_network_double_edge('F', 'D', 7, 1)
+    new_graph.add_network_double_edge('F', 'E', 5, 1)
+    new_graph.add_network_double_edge('F', 'J', 13, 1)
+    new_graph.add_network_double_edge('G', 'C', 6, 1)
+    new_graph.add_network_double_edge('G', 'B', 14, 1)
+    new_graph.add_network_double_edge('G', 'L', 3, 1)
+    new_graph.add_network_double_edge('H', 'C', 25, 1)
+    new_graph.add_network_double_edge('H', 'L', 20, 1)
+    new_graph.add_network_double_edge('H', 'I', 10, 1)
+    new_graph.add_network_double_edge('H', 'D', 15, 1)
+    new_graph.add_network_double_edge('I', 'J', 13, 1)
+    new_graph.add_network_double_edge('I', 'K', 4, 1)
+    new_graph.add_network_double_edge('I', 'H', 11, 1)
+    new_graph.add_network_double_edge('J', 'F', 8, 1)
+    new_graph.add_network_double_edge('J', 'K', 9, 1)
+    new_graph.add_network_double_edge('J', 'I', 6, 1)
+    new_graph.add_network_double_edge('K', 'I', 7, 1)
+    new_graph.add_network_double_edge('K', 'J', 10, 1)
+    new_graph.add_network_double_edge('K', 'L', 8, 1)
+    new_graph.add_network_double_edge('L', 'G', 5, 1)
+    new_graph.add_network_double_edge('L', 'H', 9, 1)
+    new_graph.add_network_double_edge('L', 'K', 11, 1)
+
+    return new_graph
 
 def create_graph(env, statistics):
     new_graph = NetworkGraph(env, statistics)
@@ -258,31 +326,42 @@ def run(update_times, sim_time):
 
     #seed(42)
     env = simpy.Environment()
-    graph = create_graph(env, statistics)
+    graph = create_big_graph(env, statistics) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
         graph.initialize(update_times)
-    print_routing_status(graph)
+    # print_routing_status(graph)
     graph.initialize_spawners()
     env.run()
-    statistics.print_demand_count()
-    statistics.print_delay_count()
+
+    # statistics.print_demand_count()
+    # statistics.print_delay_count()
     return pkt_count, pkt_total, pkt_total/pkt_count
 
 
 def run_batch(t, n):
     t_means = 0
     for k in range(n):
-        count, total, mean = run(t, 2000) # esto decía 20000
+        count, total, mean = run(t, 2000) # decía 20000
         t_means += mean
     return t_means/n
 
 if __name__ == '__main__':
     x = []
     y = []
-    inf_mean = run_batch(None, 50)
 
+    """
+    #Ejemplo de plot para un grafo
+    labels = {'A': "A", 'B': "B", 'C': "C", 'D': "D", 'E': "E", 'F': "F", 'G': "G", 'H': "H", 'I': "I", 'J': "J",
+              'K': "K", 'L': "L"}
+    statistics = Statistics()
+    graph = create_big_graph(simpy.Environment(), statistics)
+    nx.draw(G=graph, labels=labels)
+    plt.show()
+    """
+
+    inf_mean = run_batch(None, 50)
     for t in range(1, 100, 10): # decia (1, 800, 10)
         t_mean = run_batch(t, 20)
         x.append(t)
@@ -295,4 +374,3 @@ if __name__ == '__main__':
     plt.plot(x, y, 'o', x, yinf)
     plt.show()
     print(inf_mean)
-
