@@ -336,12 +336,11 @@ def run(update_times, sim_time):
     pkt_count = 0
     pkt_total = 0
 
-    statistics = Statistics()
-    statistics.plot_elements_vs_time()
 
     #seed(42)
     env = simpy.Environment()
     statistics = Statistics(env)
+    statistics.plot_elements_vs_time()
     graph = create_big_graph(env, statistics, 1.0) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
