@@ -30,6 +30,13 @@ class Statistics(object):
         self.delay_matrix = {}
         self.routing_path_matrix = {}
         self.routing_amount_matrix = {}
+        self.hl = []
+
+    def plot_elements_vs_time(self):
+        global SIMULATION_TIME
+        self.hl, = plt.plot([], [], 'b-')
+        plt.axis([0, SIMULATION_TIME, 0, 200])
+        plt.show()
 
     def update_path_for(self, origin, destination, path):
         self.routing_path_matrix[(origin, destination)] = path
@@ -195,6 +202,7 @@ class NetworkGraph(nx.DiGraph):
                     router.set_route(target, queue)
                     self.statistics.add_routing_amount_for(node, target)
                     self.statistics.update_path_for(node, target, (node, next_node))
+                    update_elements_plot(self, self.env.now, self.hl)
                     # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
 
@@ -310,6 +318,7 @@ def plot_routing_table(statistics):
     # plt.draw()
     # plt.show()
 
+
 def print_routing_status(graph):
     for node, attr in graph.node.items():
         for target, queue in attr['router'].queues.items():
@@ -323,6 +332,7 @@ def run(update_times, sim_time):
     pkt_total = 0
 
     statistics = Statistics()
+    statistics.plot_elements_vs_time()
 
     #seed(42)
     env = simpy.Environment()
@@ -346,6 +356,25 @@ def run_batch(t, n):
         count, total, mean = run(t, 2000) # decía 20000
         t_means += mean
     return t_means/n
+
+
+def update_elements_plot(g, curr_time, hl):
+    global SIMULATION_TIME
+    edges_dict = g.edge
+    elements = 0
+
+    for origin in edges_dict.keys():
+        for dest in edges_dict.get(origin):
+            elements += len(g.get_edge_data(origin, dest)['queue'].queue)
+
+    xs = hl.get_xdata()
+    xs.append(curr_time)
+    ys = hl.get_ydata()
+    ys.append(elements)
+
+    hl.set_xdata(xs)
+    hl.set_ydata(ys)
+    plt.draw()
 
 if __name__ == '__main__':
     x = []
