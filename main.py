@@ -2,6 +2,8 @@ import networkx as nx
 import simpy
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
+import matplotlib
+matplotlib.use("Qt5Agg")
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -212,32 +214,14 @@ class NetworkGraph(nx.DiGraph):
             self.update_routing('wait_time')
             debug_print('UPDATE ROUTING')
 
-def create_big_graph(env, statistics):
+
+def create_big_graph(env, statistics, demand_mult):
     new_graph = NetworkGraph(env, statistics)
-    new_graph.add_network_node('A', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('B', {'A': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('C', {'B': 1.0/10, 'A': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('D', {'B': 1.0/10, 'C': 1.0/10, 'A': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('E', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'A': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('F', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'A': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('G', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'A': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('H', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'A': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('I', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'A': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('J', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'A': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('K', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'A': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('L', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'A': 1.0/10})
+    nodes = set([chr(ord('A') + j) for j in range(12)])
+
+    for node in nodes:
+        demand = dict(map(lambda n: (n, float(demand_mult)/10.0), nodes - set([node])))
+        new_graph.add_network_node(node, demand)
 
     new_graph.add_network_double_edge('A', 'B', 4, 1)
     new_graph.add_network_double_edge('A', 'D', 7, 1)
@@ -326,7 +310,7 @@ def run(update_times, sim_time):
 
     #seed(42)
     env = simpy.Environment()
-    graph = create_big_graph(env, statistics) # era create_graph
+    graph = create_big_graph(env, statistics, 1.0) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
@@ -334,7 +318,6 @@ def run(update_times, sim_time):
     # print_routing_status(graph)
     graph.initialize_spawners()
     env.run()
-
     # statistics.print_demand_count()
     # statistics.print_delay_count()
     return pkt_count, pkt_total, pkt_total/pkt_count
@@ -343,7 +326,7 @@ def run(update_times, sim_time):
 def run_batch(t, n):
     t_means = 0
     for k in range(n):
-        count, total, mean = run(t, 2000) # decía 20000
+        count, total, mean = run(10, 100 + (t if t is not None else 0)*10) # decia 20000
         t_means += mean
     return t_means/n
 
