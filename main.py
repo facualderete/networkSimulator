@@ -2,6 +2,8 @@ import networkx as nx
 import simpy
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
+import matplotlib
+matplotlib.use("Qt5Agg")
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -12,12 +14,12 @@ pkt_total = 0
 
 def exponential_var_gen(var_lambda):
     while True:
-        yield int(round(expovariate(var_lambda)))
+        yield round(expovariate(var_lambda))
 
 
 def normal_var_gen(var_mu, var_sigma):
     while True:
-        yield int(round(normalvariate(var_mu, var_sigma)))
+        yield round(normalvariate(var_mu, var_sigma))
 
 
 def debug_print(*args):
@@ -25,11 +27,13 @@ def debug_print(*args):
     pass
 
 class Statistics(object):
-    def __init__(self):
+    def __init__(self, environment):
         self.demand_matrix = {}
         self.delay_matrix = {}
         self.routing_path_matrix = {}
         self.routing_amount_matrix = {}
+        self.env = environment
+        self.change_count_matrix = {}
         self.hl = []
 
     def plot_elements_vs_time(self):
@@ -66,6 +70,20 @@ class Statistics(object):
             # divide el total de tardanza de todos los paquetes por la cantidad de paquetes enviados
             print("DELAY ", origin, " -> ", destination, " : ", self.delay_matrix[(origin, destination)] / self.demand_matrix[(origin, destination)])
 
+    def update_path_change_counter(self, queue1, queue2):
+        if not queue1 or not queue2:
+            return
+        if queue1.next_node != queue2.next_node:
+            if env.now not in self.change_count_matrix:
+                self.change_count_matrix[env.now] = 0
+            self.change_count_matrix[env.now] += 1
+
+    def get_avg_path_change(self):
+        n = len(self.change_count_matrix)
+        if n != 0:
+            return sum(self.change_count_matrix.values()) / n
+        return 0
+
 
 class MessageRouter(object):
     def __init__(self, env, node, queues):
@@ -75,6 +93,9 @@ class MessageRouter(object):
 
     def set_route(self, target, queue):
         self.queues[target] = queue
+
+    def get_queue(self, target):
+        return self.queues[target] if target in self.queues else None
 
     def route(self, msg):
         if msg.destination == self.node:
@@ -196,13 +217,15 @@ class NetworkGraph(nx.DiGraph):
         for node, paths in results.items():
             for target, path in paths.items():
                 if len(path) > 1:
-                    router = self.node[node]['router']
                     next_node = path[1]
+                    router = self.node[node]['router']
+                    current_queue = router.get_queue(target)
                     queue = self.edge[node][next_node]['queue']
                     router.set_route(target, queue)
                     self.statistics.add_routing_amount_for(node, target)
                     self.statistics.update_path_for(node, target, (node, next_node))
                     update_elements_plot(self, self.env.now, self.hl)
+                    self.statistics.update_path_change_counter(current_queue, queue)
                     # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
 
@@ -220,32 +243,14 @@ class NetworkGraph(nx.DiGraph):
             self.update_routing('wait_time')
             debug_print('UPDATE ROUTING')
 
-def create_big_graph(env, statistics):
+
+def create_big_graph(env, statistics, demand_mult):
     new_graph = NetworkGraph(env, statistics)
-    new_graph.add_network_node('A', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('B', {'A': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('C', {'B': 1.0/10, 'A': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('D', {'B': 1.0/10, 'C': 1.0/10, 'A': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('E', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'A': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('F', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'A': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('G', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'A': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('H', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'A': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('I', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'A': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('J', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'A': 1.0/10, 'K': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('K', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'A': 1.0/10, 'L': 1.0/10})
-    new_graph.add_network_node('L', {'B': 1.0/10, 'C': 1.0/10, 'D': 1.0/10, 'E': 1.0/10, 'F': 1.0/10, 'G': 1.0/10,
-        'H': 1.0/10, 'I': 1.0/10, 'J': 1.0/10, 'K': 1.0/10, 'A': 1.0/10})
+    nodes = set([chr(ord('A') + j) for j in range(12)])
+
+    for node in nodes:
+        demand = dict(map(lambda n: (n, float(demand_mult)/10.0), nodes - set([node])))
+        new_graph.add_network_node(node, demand)
 
     new_graph.add_network_double_edge('A', 'B', 4, 1)
     new_graph.add_network_double_edge('A', 'D', 7, 1)
@@ -336,7 +341,8 @@ def run(update_times, sim_time):
 
     #seed(42)
     env = simpy.Environment()
-    graph = create_big_graph(env, statistics) # era create_graph
+    statistics = Statistics(env)
+    graph = create_big_graph(env, statistics, 1.0) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
@@ -344,18 +350,22 @@ def run(update_times, sim_time):
     # print_routing_status(graph)
     graph.initialize_spawners()
     env.run()
-
     # statistics.print_demand_count()
     # statistics.print_delay_count()
-    return pkt_count, pkt_total, pkt_total/pkt_count
+    avg_path_change = statistics.get_avg_path_change()
+    return pkt_count, pkt_total, pkt_total/pkt_count, avg_path_change
 
 
-def run_batch(t, n):
+
+
+def run_batch(update_times, batch_size):
     t_means = 0
-    for k in range(n):
-        count, total, mean = run(t, 2000) # decía 20000
+    avg_path_change = 0
+    for k in range(update_times):
+        count, total, mean, avg_pchg = run(10, 100 + (t if t is not None else 0)*10) # decia 20000
         t_means += mean
-    return t_means/n
+        avg_path_change += avg_pchg
+    return t_means / batch_size, avg_path_change / batch_size
 
 
 def update_elements_plot(g, curr_time, hl):
@@ -379,6 +389,7 @@ def update_elements_plot(g, curr_time, hl):
 if __name__ == '__main__':
     x = []
     y = []
+    z = []
 
     """
     #Ejemplo de plot para un grafo
@@ -391,15 +402,29 @@ if __name__ == '__main__':
     """
 
     inf_mean = run_batch(None, 50)
-    for t in range(1, 100, 10): # decia (1, 800, 10)
-        t_mean = run_batch(t, 20)
+    for t in range(1, 200, 10): # decia (1, 800, 10)
+        t_mean, path_change = run_batch(t, 20)
         x.append(t)
         y.append(t_mean)
+        z.append(path_change)
         print(t, t_mean)
+        print("Path change: %f, %f" % (t, path_change))
 
     x = np.array(x)
     y = np.array(y)
     yinf = np.array([inf_mean]*len(x))
-    plt.plot(x, y, 'o', x, yinf)
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(x, y, 'o')
+    plt.grid(True)
+    plt.xlabel("Tiempo de refresco")
+    plt.ylabel("Tiempo promedio en el sistema")
+    plt.title("Tiempo en el sistema de cada mensaje en función del refresco")
+
+    plt.subplot(212)
+    plt.plot(x, z, 'x')
+    plt.grid(True)
+    plt.xlabel("Tiempo de refresco")
+    plt.ylabel("Cambio promedio en el routeo")
     plt.show()
     print(inf_mean)
