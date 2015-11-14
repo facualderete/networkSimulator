@@ -358,11 +358,11 @@ def run(update_times, sim_time):
 
 
 
-def run_batch(update_times, batch_size):
+def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
-    for k in range(update_times):
-        count, total, mean, avg_pchg = run(10, 100 + (t if t is not None else 0)*10) # decia 20000
+    for k in range(batch_size):
+        count, total, mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         t_means += mean
         avg_path_change += avg_pchg
     return t_means / batch_size, avg_path_change / batch_size
