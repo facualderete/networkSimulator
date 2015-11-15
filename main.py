@@ -4,10 +4,9 @@ import time
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
 
-import matplotlib
-PREFERRED_BACKEND = 'Qt5Agg'
-if PREFERRED_BACKEND in matplotlib.rcsetup.all_backends:
-    matplotlib.use(PREFERRED_BACKEND)
+import sys
+if sys.platform == 'linux':
+    import matplotlib; matplotlib.use('Qt5Agg')
 
 from matplotlib import pyplot as plt
 import numpy as np
