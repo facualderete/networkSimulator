@@ -3,10 +3,14 @@ import simpy
 import time
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
-import matplotlib
-# matplotlib.use("Qt5Agg")
+
+import sys
+if sys.platform == 'linux':
+    import matplotlib; matplotlib.use('Qt5Agg')
+
 from matplotlib import pyplot as plt
 import numpy as np
+
 
 def exponential_var_gen(var_lambda):
     while True:
@@ -22,8 +26,8 @@ def debug_print(*args):
     # print(*args)
     pass
 
-class Statistics(object):
 
+class Statistics(object):
 
     def __init__(self, environment, sim_time):
         self.change_count_matrix = {}
@@ -33,25 +37,33 @@ class Statistics(object):
         self.routing_path_matrix = {}
         self.routing_amount_matrix = {}
         self.env = environment
-        self.hl = []
+        self.current_update = 0
+        self.hl = []  # used for plotting
         self.sim_time = sim_time
-
 
     def init_dynamic_plots(self):
         fig = plt.figure(1)
         self.hl = fig
 
-        fig.add_subplot(211)
+        fig.add_subplot(311)
         ax = fig.gca()
-        ax.set_xlabel("Tiempo del simulador")
+        # ax.set_xlabel("Tiempo del simulador")
         ax.set_ylabel("Cantidad de elementos")
         plt.plot([], [], 'b-')
 
-        fig.add_subplot(212)
+        fig.add_subplot(312)
         ax = fig.gca()
-        ax.set_xlabel("Tiempo del simulador")
+        # ax.set_xlabel("Tiempo del simulador")
         ax.set_ylabel("Tiempo en el sistema")
         plt.plot([], [], 'b-')
+
+        fig.add_subplot(313)
+        ax = fig.gca()
+        ax.set_xlabel("Tiempo del simulador")
+        ax.set_ylabel("Cambios en el ruteo")
+        plt.plot([], [], 'b-')
+
+        fig.subplots_adjust(hspace=0)
 
         plt.ion()
         plt.draw()
@@ -89,13 +101,14 @@ class Statistics(object):
             # divide el total de tardanza de todos los paquetes por la cantidad de paquetes enviados
             print("DELAY ", origin, " -> ", destination, " : ", self.delay_matrix[(origin, destination)] / self.demand_matrix[(origin, destination)])
 
-    def update_path_change_counter(self, queue1, queue2):
+    def update_path_change_counter(self, node, target, queue1, queue2):
         if not queue1 or not queue2:
             return
         if queue1.next_node != queue2.next_node:
-            if env.now not in self.change_count_matrix:
-                self.change_count_matrix[self.env.now] = 0
-            self.change_count_matrix[self.env.now] += 1
+            if self.current_update not in self.change_count_matrix:
+                self.change_count_matrix[self.current_update] = 0
+            self.change_count_matrix[self.current_update] += 1
+            print('{:^18d} {:^5s} {:^5s} {:^3s}'.format(self.current_update, node, target, queue1.next_node))
 
     def get_avg_path_change(self):
         n = len(self.change_count_matrix)
@@ -249,9 +262,10 @@ class NetworkGraph(nx.DiGraph):
                     current_queue = router.get_queue(target)
                     queue = self.edge[node][next_node]['queue']
                     router.set_route(target, queue)
-                    self.statistics.update_path_change_counter(current_queue, queue)
+                    self.statistics.update_path_change_counter(node, target, current_queue, queue)
                     # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
+        self.statistics.current_update += 1
 
     def initialize_spawners(self):
         for node, attributes in self.node.items():
@@ -362,10 +376,11 @@ def run(update_times, sim_time):
     env = simpy.Environment()
     statistics = Statistics(env, sim_time)
     statistics.init_dynamic_plots()
-    graph = create_big_graph(env, statistics, sim_time, 0.2) # era create_graph
+    graph = create_big_graph(env, statistics, sim_time, 0.13) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
+        print("Número de Refresco|Desde|Hasta|Por")
         graph.initialize(update_times)
     # print_routing_status(graph)
     graph.initialize_spawners()
@@ -392,7 +407,7 @@ def update_elements_plot(g, curr_time, sim_time, hl):
     while env.now < sim_time:
         yield env.timeout(1)
 
-        ax1, ax2 = hl.get_axes()
+        ax1, ax2, ax3 = hl.get_axes()
         elements = 0
         for origin in edges_dict.keys():
             for dest in edges_dict.get(origin):
@@ -400,16 +415,23 @@ def update_elements_plot(g, curr_time, sim_time, hl):
         line = ax1.get_lines()[0]
         xs = np.append(line.get_xdata(), env.now)
         ys = np.append(line.get_ydata(), elements)
-        ax1.set_xlim([0, int(max(xs) * 1.2)])
+        max_x = int(max(xs) * 1.2)
+        ax1.set_xlim([0, max_x])
         ax1.set_ylim([0, int(max(ys) * 1.2)])
         line.set_xdata(xs)
         line.set_ydata(ys)
 
         line = ax2.get_lines()[0]
-        xs = np.append(line.get_xdata(), env.now)
         ys = np.append(line.get_ydata(), g.statistics.get_total_avg_delay())
-        ax2.set_xlim([0, max(xs) * 1.2])
+        ax2.set_xlim([0, max_x])
         ax2.set_ylim([0, max(ys) * 1.2])
+        line.set_xdata(xs)
+        line.set_ydata(ys)
+
+        line = ax3.get_lines()[0]
+        ys = np.append(line.get_ydata(), g.statistics.get_avg_path_change())
+        ax3.set_xlim([0, max_x])
+        ax3.set_ylim([0, max(ys) * 1.2])
         line.set_xdata(xs)
         line.set_ydata(ys)
 
