@@ -37,7 +37,7 @@ class Statistics(object):
         self.sim_time = sim_time
 
 
-    def plot_elements_vs_time(self):
+    def init_dynamic_plots(self):
         self.hl, = plt.plot([], [], 'b-')
         plt.axis([0, 200, 0, 500])
         plt.ion()
@@ -57,15 +57,14 @@ class Statistics(object):
         self.demand_matrix[(origin, destination)] += 1
 
     def add_delay_count(self, origin, destination, delay):
-        if not (origin, destination) in self.delay_matrix.keys():
+        if not (origin, destination) in self.delay_matrix:
             self.delay_matrix[(origin, destination)] = 0
         self.delay_matrix[(origin, destination)] += delay
-        self.times_in_transit.append(delay)
 
     def add_arrived_count(self, origin, destination):
-        if not (origin, destination) in self.delay_matrix.keys():
-            self.delay_matrix[(origin, destination)] = 0
-        self.delay_matrix[(origin, destination)] += 1
+        if not (origin, destination) in self.arrived_matrix:
+            self.arrived_matrix[(origin, destination)] = 0
+        self.arrived_matrix[(origin, destination)] += 1
 
     def print_demand_count(self):
         for (origin, destination) in self.demand_matrix.keys():
@@ -349,7 +348,7 @@ def run(update_times, sim_time):
     #seed(42)
     env = simpy.Environment()
     statistics = Statistics(env, sim_time)
-    statistics.plot_elements_vs_time()
+    statistics.init_dynamic_plots()
     graph = create_big_graph(env, statistics, sim_time, 0.2) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
