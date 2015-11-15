@@ -38,8 +38,21 @@ class Statistics(object):
 
 
     def init_dynamic_plots(self):
-        self.hl, = plt.plot([], [], 'b-')
-        plt.axis([0, 200, 0, 500])
+        fig = plt.figure(1)
+        self.hl = fig
+
+        fig.add_subplot(211)
+        ax = fig.gca()
+        ax.set_xlabel("Tiempo del simulador")
+        ax.set_ylabel("Cantidad de elementos")
+        plt.plot([], [], 'b-')
+
+        fig.add_subplot(212)
+        ax = fig.gca()
+        ax.set_xlabel("Tiempo del simulador")
+        ax.set_ylabel("Tiempo en el sistema")
+        plt.plot([], [], 'b-')
+
         plt.ion()
         plt.draw()
 
@@ -379,18 +392,27 @@ def update_elements_plot(g, curr_time, sim_time, hl):
     while env.now < sim_time:
         yield env.timeout(1)
 
+        ax1, ax2 = hl.get_axes()
         elements = 0
-
         for origin in edges_dict.keys():
             for dest in edges_dict.get(origin):
                 elements += len(g.get_edge_data(origin, dest)['queue'].queue)
+        line = ax1.get_lines()[0]
+        xs = np.append(line.get_xdata(), env.now)
+        ys = np.append(line.get_ydata(), elements)
+        ax1.set_xlim([0, int(max(xs) * 1.2)])
+        ax1.set_ylim([0, int(max(ys) * 1.2)])
+        line.set_xdata(xs)
+        line.set_ydata(ys)
 
-        print("t: %f, elements: %d" % (env.now, elements))
-        xs = np.append(hl.get_xdata(), env.now)
-        ys = np.append(hl.get_ydata(), elements)
+        line = ax2.get_lines()[0]
+        xs = np.append(line.get_xdata(), env.now)
+        ys = np.append(line.get_ydata(), g.statistics.get_total_avg_delay())
+        ax2.set_xlim([0, max(xs) * 1.2])
+        ax2.set_ylim([0, max(ys) * 1.2])
+        line.set_xdata(xs)
+        line.set_ydata(ys)
 
-        hl.set_xdata(xs)
-        hl.set_ydata(ys)
         plt.pause(0.01)
     plt.clf()
 
