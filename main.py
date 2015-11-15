@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 SIMULATION_TIME = 2000
+TIME_UNIT = 1
 
 pkt_count = 0
 pkt_total = 0
@@ -29,13 +30,15 @@ def debug_print(*args):
 
 class Statistics(object):
     def __init__(self, environment):
-        self.demand_matrix = {}
-        self.delay_matrix = {}
-        self.routing_path_matrix = {}
-        self.routing_amount_matrix = {}
-        self.env = environment
         self.change_count_matrix = {}
+        self.delay_matrix = {}
+        self.demand_matrix = {}
+        self.env = environment
         self.hl = []
+        self.routing_amount_matrix = {}
+        self.routing_path_matrix = {}
+        self.times_in_transit = []
+        self.avg_time_int_transit = 0
 
     def plot_elements_vs_time(self):
         global SIMULATION_TIME
@@ -61,6 +64,7 @@ class Statistics(object):
         if not (origin, destination) in self.delay_matrix.keys():
             self.delay_matrix[(origin, destination)] = 0
         self.delay_matrix[(origin, destination)] += delay
+        self.times_in_transit.append(delay)
 
     def print_demand_count(self):
         for (origin, destination) in self.demand_matrix.keys():
@@ -216,7 +220,6 @@ class NetworkGraph(nx.DiGraph):
 
     def update_routing(self, weight):
         results = nx.shortest_path(self, weight=weight)
-        update_elements_plot(self, self.env.now, self.statistics.hl)
         for node, paths in results.items():
             for target, path in paths.items():
                 if len(path) > 1:
@@ -235,6 +238,8 @@ class NetworkGraph(nx.DiGraph):
 
     def initialize(self, update_time):
         simpy.events.Process(env, self._update_routing_events(update_time))
+        simpy.events.Process(env, update_elements_plot(self, self.env.now,
+                                                       self.statistics.hl))
 
     def _update_routing_events(self, update_time):
         while self.env.now < SIMULATION_TIME:
@@ -355,8 +360,6 @@ def run(update_times, sim_time):
     return pkt_count, pkt_total, pkt_total/pkt_count, avg_path_change
 
 
-
-
 def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
@@ -369,21 +372,25 @@ def run_batch(update_time, batch_size):
 
 
 def update_elements_plot(g, curr_time, hl):
-    global SIMULATION_TIME
+    global SIMULATION_TIME, TIME_UNIT
     edges_dict = g.edge
-    elements = 0
+    while env.now < SIMULATION_TIME:
+        yield env.timeout(TIME_UNIT)
 
-    for origin in edges_dict.keys():
-        for dest in edges_dict.get(origin):
-            elements += len(g.get_edge_data(origin, dest)['queue'].queue)
+        elements = 0
 
-    print("t: %f, elements: %d" % (curr_time, elements))
-    xs = np.append(hl.get_xdata(), curr_time)
-    ys = np.append(hl.get_ydata(), elements)
+        for origin in edges_dict.keys():
+            for dest in edges_dict.get(origin):
+                elements += len(g.get_edge_data(origin, dest)['queue'].queue)
 
-    hl.set_xdata(xs)
-    hl.set_ydata(ys)
-    plt.pause(0.01)
+        print("t: %f, elements: %d" % (env.now, elements))
+        xs = np.append(hl.get_xdata(), env.now)
+        ys = np.append(hl.get_ydata(), elements)
+
+        hl.set_xdata(xs)
+        hl.set_ydata(ys)
+        plt.pause(0.01)
+    plt.clf()
 
 if __name__ == '__main__':
     x = []
