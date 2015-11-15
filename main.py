@@ -3,8 +3,12 @@ import simpy
 import time
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
+
 import matplotlib
-matplotlib.use("Qt5Agg")
+PREFERRED_BACKEND = 'Qt5Agg'
+if PREFERRED_BACKEND in matplotlib.rcsetup.all_backends:
+    matplotlib.use(PREFERRED_BACKEND)
+
 from matplotlib import pyplot as plt
 import numpy as np
 
