@@ -4,9 +4,10 @@ import time
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
 import matplotlib
-# matplotlib.use("Qt5Agg")
+matplotlib.use("Qt5Agg")
 from matplotlib import pyplot as plt
 import numpy as np
+
 
 def exponential_var_gen(var_lambda):
     while True:
@@ -22,8 +23,8 @@ def debug_print(*args):
     # print(*args)
     pass
 
-class Statistics(object):
 
+class Statistics(object):
 
     def __init__(self, environment, sim_time):
         self.change_count_matrix = {}
@@ -33,9 +34,9 @@ class Statistics(object):
         self.routing_path_matrix = {}
         self.routing_amount_matrix = {}
         self.env = environment
-        self.hl = []
+        self.current_update = 0
+        self.hl = []  # used for plotting
         self.sim_time = sim_time
-
 
     def init_dynamic_plots(self):
         self.hl, = plt.plot([], [], 'b-')
@@ -76,13 +77,14 @@ class Statistics(object):
             # divide el total de tardanza de todos los paquetes por la cantidad de paquetes enviados
             print("DELAY ", origin, " -> ", destination, " : ", self.delay_matrix[(origin, destination)] / self.demand_matrix[(origin, destination)])
 
-    def update_path_change_counter(self, queue1, queue2):
+    def update_path_change_counter(self, node, target, queue1, queue2):
         if not queue1 or not queue2:
             return
         if queue1.next_node != queue2.next_node:
-            if env.now not in self.change_count_matrix:
-                self.change_count_matrix[self.env.now] = 0
-            self.change_count_matrix[self.env.now] += 1
+            if self.current_update not in self.change_count_matrix:
+                self.change_count_matrix[self.current_update] = 0
+            self.change_count_matrix[self.current_update] += 1
+            print('{:^18d} {:^5s} {:^5s} {:^3s}'.format(self.current_update, node, target, queue1.next_node))
 
     def get_avg_path_change(self):
         n = len(self.change_count_matrix)
@@ -236,9 +238,10 @@ class NetworkGraph(nx.DiGraph):
                     current_queue = router.get_queue(target)
                     queue = self.edge[node][next_node]['queue']
                     router.set_route(target, queue)
-                    self.statistics.update_path_change_counter(current_queue, queue)
+                    self.statistics.update_path_change_counter(node, target, current_queue, queue)
                     # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
+        self.statistics.current_update += 1
 
     def initialize_spawners(self):
         for node, attributes in self.node.items():
@@ -349,10 +352,11 @@ def run(update_times, sim_time):
     env = simpy.Environment()
     statistics = Statistics(env, sim_time)
     statistics.init_dynamic_plots()
-    graph = create_big_graph(env, statistics, sim_time, 0.2) # era create_graph
+    graph = create_big_graph(env, statistics, sim_time, 0.13) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
+        print("Número de Refresco|Desde|Hasta|Por")
         graph.initialize(update_times)
     # print_routing_status(graph)
     graph.initialize_spawners()
@@ -385,7 +389,7 @@ def update_elements_plot(g, curr_time, sim_time, hl):
             for dest in edges_dict.get(origin):
                 elements += len(g.get_edge_data(origin, dest)['queue'].queue)
 
-        print("t: %f, elements: %d" % (env.now, elements))
+        # print("t: %f, elements: %d" % (env.now, elements))
         xs = np.append(hl.get_xdata(), env.now)
         ys = np.append(hl.get_ydata(), elements)
 
