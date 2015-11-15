@@ -8,12 +8,6 @@ import matplotlib
 from matplotlib import pyplot as plt
 import numpy as np
 
-SIMULATION_TIME = 2000
-TIME_UNIT = 1
-
-pkt_count = 0
-pkt_total = 0
-
 def exponential_var_gen(var_lambda):
     while True:
         yield round(expovariate(var_lambda))
@@ -29,19 +23,21 @@ def debug_print(*args):
     pass
 
 class Statistics(object):
-    def __init__(self, environment):
+
+
+    def __init__(self, environment, sim_time):
         self.change_count_matrix = {}
-        self.delay_matrix = {}
         self.demand_matrix = {}
+        self.delay_matrix = {}
+        self.arrived_matrix = {}
+        self.routing_path_matrix = {}
+        self.routing_amount_matrix = {}
         self.env = environment
         self.hl = []
-        self.routing_amount_matrix = {}
-        self.routing_path_matrix = {}
-        self.times_in_transit = []
-        self.avg_time_int_transit = 0
+        self.sim_time = sim_time
+
 
     def plot_elements_vs_time(self):
-        global SIMULATION_TIME
         self.hl, = plt.plot([], [], 'b-')
         plt.axis([0, 200, 0, 500])
         plt.ion()
@@ -66,6 +62,11 @@ class Statistics(object):
         self.delay_matrix[(origin, destination)] += delay
         self.times_in_transit.append(delay)
 
+    def add_arrived_count(self, origin, destination):
+        if not (origin, destination) in self.delay_matrix.keys():
+            self.delay_matrix[(origin, destination)] = 0
+        self.delay_matrix[(origin, destination)] += 1
+
     def print_demand_count(self):
         for (origin, destination) in self.demand_matrix.keys():
             print("DEMAND ", origin, " -> ", destination, " : ", self.demand_matrix[(origin, destination)])
@@ -89,6 +90,14 @@ class Statistics(object):
         if n != 0:
             return sum(self.change_count_matrix.values()) / n
         return 0
+
+    def get_total_avg_delay(self):
+        total_arrivals = sum(self.arrived_matrix.values())
+        total_delays = sum(self.delay_matrix.values())
+        if total_delays > 0 and total_arrivals > 0:
+            return float(total_delays)/float(total_arrivals)
+        else:
+            return 0
 
 
 class MessageRouter(object):
@@ -140,19 +149,20 @@ class MessageQueue(object):
 
 
 class MessageSpawner(object):
-    def __init__(self, env, statistics, origin, origin_router, demand):
+    def __init__(self, env, statistics, sim_time, origin, origin_router, demand):
         self.env = env
         self.origin = origin
         self.origin_router = origin_router
         self.demand = demand
         self.statistics = statistics
+        self.sim_time = sim_time
 
     def initialize(self):
         for destination, spawn_times in self.demand.items():
             simpy.events.Process(env, self._trigger(destination, spawn_times))
 
     def _trigger(self, destination, spawn_times):
-        while self.env.now < SIMULATION_TIME:
+        while self.env.now < self.sim_time:
             yield self.env.timeout(next(spawn_times))
             msg = Message(self.env, self.statistics, self.origin, destination)
             self.statistics.add_demand_count(self.origin, destination)
@@ -173,10 +183,8 @@ class Message(object):
         debug_print('CREATE', self)
 
     def terminate(self):
-        global pkt_count, pkt_total
-        pkt_count += 1
-        pkt_total += self.time_in_transit()
         self.statistics.add_delay_count(self.origin, self.destination, self.time_in_transit())
+        self.statistics.add_arrived_count(self.origin, self.destination)
         debug_print('DESTROY', self)
 
     def time_in_transit(self):
@@ -193,15 +201,16 @@ class Message(object):
 
 
 class NetworkGraph(nx.DiGraph):
-    def __init__(self, env, statistics, data = None, **attr):
+    def __init__(self, env, statistics, sim_time, data = None, **attr):
         super(NetworkGraph, self).__init__(data, **attr)
         self.env = env
         self.statistics = statistics
+        self.sim_time = sim_time
 
     def add_network_node(self, name, demand):
         demand = dict(map(lambda kv: (kv[0], exponential_var_gen(kv[1])), demand.items()))
         router = MessageRouter(self.env, name, {})
-        spawner = MessageSpawner(self.env, self.statistics, name, router, demand)
+        spawner = MessageSpawner(self.env, self.statistics, self.sim_time, name, router, demand)
         self.add_node(name, router=router, spawner=spawner)
 
     def add_network_edge(self, source, destination, mu, sigma):
@@ -238,19 +247,19 @@ class NetworkGraph(nx.DiGraph):
 
     def initialize(self, update_time):
         simpy.events.Process(env, self._update_routing_events(update_time))
-        simpy.events.Process(env, update_elements_plot(self, self.env.now,
+        simpy.events.Process(env, update_elements_plot(self, self.env.now, self.sim_time,
                                                        self.statistics.hl))
 
     def _update_routing_events(self, update_time):
-        while self.env.now < SIMULATION_TIME:
+        while self.env.now < self.sim_time:
             yield self.env.timeout(update_time)
             self.update_times()
             self.update_routing('wait_time')
             debug_print('UPDATE ROUTING')
 
 
-def create_big_graph(env, statistics, demand_mult):
-    new_graph = NetworkGraph(env, statistics)
+def create_big_graph(env, statistics, sim_time, demand_mult):
+    new_graph = NetworkGraph(env, statistics, sim_time)
     nodes = set([chr(ord('A') + j) for j in range(12)])
 
     for node in nodes:
@@ -298,8 +307,8 @@ def create_big_graph(env, statistics, demand_mult):
 
     return new_graph
 
-def create_graph(env, statistics):
-    new_graph = NetworkGraph(env, statistics)
+def create_graph(env, statistics, sim_time):
+    new_graph = NetworkGraph(env, statistics, sim_time)
     new_graph.add_network_node('A', {'B': 1.0/10})
     new_graph.add_network_node('B', {'A': 1.0/10})
     new_graph.add_network_node('C', {})
@@ -336,17 +345,12 @@ def print_routing_status(graph):
 
 
 def run(update_times, sim_time):
-    global env, pkt_count, pkt_total, SIMULATION_TIME
-    SIMULATION_TIME = sim_time
-    pkt_count = 0
-    pkt_total = 0
-
-
+    global env
     #seed(42)
     env = simpy.Environment()
-    statistics = Statistics(env)
+    statistics = Statistics(env, sim_time)
     statistics.plot_elements_vs_time()
-    graph = create_big_graph(env, statistics, 0.2) # era create_graph
+    graph = create_big_graph(env, statistics, sim_time, 0.2) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
@@ -357,25 +361,24 @@ def run(update_times, sim_time):
     # statistics.print_demand_count()
     # statistics.print_delay_count()
     avg_path_change = statistics.get_avg_path_change()
-    return pkt_count, pkt_total, pkt_total/pkt_count, avg_path_change
+    return statistics.get_total_avg_delay(), avg_path_change
 
 
 def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
     for k in range(batch_size):
-        # count, total, mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
-        count, total, mean, avg_pchg = run(update_time, 200) # decia 20000
+        mean, avg_pchg = run(update_time, 200) # decia 20000
+        #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         t_means += mean
         avg_path_change += avg_pchg
     return t_means / batch_size, avg_path_change / batch_size
 
 
-def update_elements_plot(g, curr_time, hl):
-    global SIMULATION_TIME, TIME_UNIT
+def update_elements_plot(g, curr_time, sim_time, hl):
     edges_dict = g.edge
-    while env.now < SIMULATION_TIME:
-        yield env.timeout(TIME_UNIT)
+    while env.now < sim_time:
+        yield env.timeout(1)
 
         elements = 0
 
