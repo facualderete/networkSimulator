@@ -1,13 +1,14 @@
 import networkx as nx
 import simpy
+import time
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
 import matplotlib
-matplotlib.use("Qt5Agg")
+# matplotlib.use("Qt5Agg")
 from matplotlib import pyplot as plt
 import numpy as np
 
-SIMULATION_TIME = 1000
+SIMULATION_TIME = 2000
 
 pkt_count = 0
 pkt_total = 0
@@ -39,8 +40,9 @@ class Statistics(object):
     def plot_elements_vs_time(self):
         global SIMULATION_TIME
         self.hl, = plt.plot([], [], 'b-')
-        plt.axis([0, SIMULATION_TIME, 0, 200])
-        plt.show()
+        plt.axis([0, 200, 0, 500])
+        plt.ion()
+        plt.draw()
 
     def update_path_for(self, origin, destination, path):
         self.routing_path_matrix[(origin, destination)] = path
@@ -75,8 +77,8 @@ class Statistics(object):
             return
         if queue1.next_node != queue2.next_node:
             if env.now not in self.change_count_matrix:
-                self.change_count_matrix[env.now] = 0
-            self.change_count_matrix[env.now] += 1
+                self.change_count_matrix[self.env.now] = 0
+            self.change_count_matrix[self.env.now] += 1
 
     def get_avg_path_change(self):
         n = len(self.change_count_matrix)
@@ -214,6 +216,7 @@ class NetworkGraph(nx.DiGraph):
 
     def update_routing(self, weight):
         results = nx.shortest_path(self, weight=weight)
+        update_elements_plot(self, self.env.now, self.statistics.hl)
         for node, paths in results.items():
             for target, path in paths.items():
                 if len(path) > 1:
@@ -222,9 +225,6 @@ class NetworkGraph(nx.DiGraph):
                     current_queue = router.get_queue(target)
                     queue = self.edge[node][next_node]['queue']
                     router.set_route(target, queue)
-                    self.statistics.add_routing_amount_for(node, target)
-                    self.statistics.update_path_for(node, target, (node, next_node))
-                    update_elements_plot(self, self.env.now, self.hl)
                     self.statistics.update_path_change_counter(current_queue, queue)
                     # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
@@ -341,7 +341,7 @@ def run(update_times, sim_time):
     env = simpy.Environment()
     statistics = Statistics(env)
     statistics.plot_elements_vs_time()
-    graph = create_big_graph(env, statistics, 1.0) # era create_graph
+    graph = create_big_graph(env, statistics, 0.2) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
@@ -361,7 +361,8 @@ def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
     for k in range(batch_size):
-        count, total, mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
+        # count, total, mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
+        count, total, mean, avg_pchg = run(update_time, 200) # decia 20000
         t_means += mean
         avg_path_change += avg_pchg
     return t_means / batch_size, avg_path_change / batch_size
@@ -376,14 +377,13 @@ def update_elements_plot(g, curr_time, hl):
         for dest in edges_dict.get(origin):
             elements += len(g.get_edge_data(origin, dest)['queue'].queue)
 
-    xs = hl.get_xdata()
-    xs.append(curr_time)
-    ys = hl.get_ydata()
-    ys.append(elements)
+    print("t: %f, elements: %d" % (curr_time, elements))
+    xs = np.append(hl.get_xdata(), curr_time)
+    ys = np.append(hl.get_ydata(), elements)
 
     hl.set_xdata(xs)
     hl.set_ydata(ys)
-    plt.draw()
+    plt.pause(0.01)
 
 if __name__ == '__main__':
     x = []
@@ -401,7 +401,7 @@ if __name__ == '__main__':
     """
 
     inf_mean = run_batch(None, 50)
-    for t in range(1, 200, 10): # decia (1, 800, 10)
+    for t in range(1, 300, 10): # decia (1, 800, 10)
         t_mean, path_change = run_batch(t, 20)
         x.append(t)
         y.append(t_mean)
