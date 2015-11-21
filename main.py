@@ -347,27 +347,6 @@ def create_graph(env, statistics, sim_time):
     new_graph.add_network_double_edge('B', 'C', 10, 1)
     return new_graph
 
-def plot_routing_table(statistics):
-    # plt.close()
-    columns = ('# refrescos', 'Origen - Destino', 'Por arista...')
-    rows = []
-    refresh = []
-    route = []
-    for (origin, destination) in statistics.routing_amount_matrix.keys():
-        rows.append((statistics.routing_amount_matrix[(origin, destination)],
-                     origin + " - " + destination,
-                    statistics.routing_path_matrix[(origin, destination)]
-                     ))
-        refresh.append(statistics.routing_amount_matrix[(origin, destination)])
-        route.append(statistics.routing_path_matrix[(origin, destination)])
-
-    plt.table(cellText=rows,
-              colLabels=columns,
-              loc='center')
-    # plt.draw()
-    # plt.show()
-
-
 def print_routing_status(graph):
     for node, attr in graph.node.items():
         for target, queue in attr['router'].queues.items():
@@ -401,10 +380,17 @@ def run_batch(update_time, batch_size):
     for k in range(batch_size):
         mean, avg_pchg = run(update_time, 500) # decia 20000
         #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
+        # acá imprimir mean (es el tiempo promedio de viaje de la corrida) y 1/updade_time
+        if update_time is not None:
+            print_to_file("0.13;"+str(1/update_time)+";"+str(mean))
         t_means += mean
         avg_path_change += avg_pchg
     return t_means / batch_size, avg_path_change / batch_size
 
+def print_to_file(line):
+    f = open('output.csv', 'a')
+    f.write(line + '\n')
+    f.close()
 
 def update_elements_plot(g, update_time, sim_time, hl):
     edges_dict = g.edge
@@ -449,15 +435,7 @@ if __name__ == '__main__':
     y = []
     z = []
 
-    """
-    #Ejemplo de plot para un grafo
-    labels = {'A': "A", 'B': "B", 'C': "C", 'D': "D", 'E': "E", 'F': "F", 'G': "G", 'H': "H", 'I': "I", 'J': "J",
-              'K': "K", 'L': "L"}
-    statistics = Statistics()
-    graph = create_big_graph(simpy.Environment(), statistics)
-    nx.draw(G=graph, labels=labels)
-    plt.show()
-    """
+    print_to_file("demand; frequency; avg_travel_time")
 
     inf_mean = run_batch(None, 50)
     for t in range(1, 300, 10): # decia (1, 800, 10)
