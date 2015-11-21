@@ -314,6 +314,15 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
     # new_graph.add_network_double_edge('L', 'H', 9, 1)
     # new_graph.add_network_double_edge('L', 'K', 11, 1)
 
+    # para que sea 4 conexo:
+    new_graph.add_network_node('B', 'F')
+    new_graph.add_network_node('G', 'J')
+    new_graph.add_network_node('C', 'L')
+    new_graph.add_network_node('A', 'I')
+    new_graph.add_network_node('E', 'H')
+    new_graph.add_network_node('D', 'K')
+
+
     return new_graph
 
 def create_graph(env, statistics, sim_time):
