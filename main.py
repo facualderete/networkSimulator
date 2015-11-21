@@ -42,8 +42,30 @@ class Statistics(object):
         self.sim_time = sim_time
 
     def init_dynamic_plots(self):
-        self.hl, = plt.plot([], [], 'b-')
-        plt.axis([0, 200, 0, 500])
+        fig = plt.figure(1)
+        self.hl = fig
+
+        fig.add_subplot(311)
+        ax = fig.gca()
+        ax.set_ylabel("Cantidad de elementos")
+        ax.grid(True)
+        plt.plot([], [], 'b-')
+
+        fig.add_subplot(312)
+        ax = fig.gca()
+        ax.set_ylabel("Tiempo en el sistema")
+        ax.grid(True)
+        plt.plot([], [], 'b-')
+
+        fig.add_subplot(313)
+        ax = fig.gca()
+        ax.set_xlabel("Tiempo del simulador")
+        ax.set_ylabel("Cambios en el ruteo")
+        ax.grid(True)
+        plt.plot([], [], 'b-')
+
+        fig.subplots_adjust(hspace=0)
+
         plt.ion()
         plt.draw()
 
@@ -87,13 +109,15 @@ class Statistics(object):
             if self.current_update not in self.change_count_matrix:
                 self.change_count_matrix[self.current_update] = 0
             self.change_count_matrix[self.current_update] += 1
-            print('{:^18d} {:^5s} {:^5s} {:^3s}'.format(self.current_update, node, target, queue1.next_node))
+            # print('{:^18d} {:^5s} {:^5s} {:^3s}'.format(self.current_update, node, target, queue1.next_node))
 
     def get_avg_path_change(self):
-        n = len(self.change_count_matrix)
-        if n != 0:
-            return sum(self.change_count_matrix.values()) / n
-        return 0
+        # n = len(self.change_count_matrix)
+        # if n != 0:
+        #     return sum(self.change_count_matrix.values()) / n
+        if self.current_update not in self.change_count_matrix:
+            self.change_count_matrix[self.current_update] = 0
+        return self.change_count_matrix[self.current_update]
 
     def get_total_avg_delay(self):
         total_arrivals = sum(self.arrived_matrix.values())
@@ -226,8 +250,9 @@ class NetworkGraph(nx.DiGraph):
         self.add_network_edge(u, v, mu, sigma)
         self.add_network_edge(v, u, mu, sigma)
 
-    def add_network_double_edge(self, u, v):
+    def add_network_double_edge_normalvariate(self, u, v):
         mean = normalvariate(35, 16)
+        print(mean)
         dev = 4
         self.add_network_double_edge(u, v, mean, dev)
 
@@ -238,6 +263,7 @@ class NetworkGraph(nx.DiGraph):
 
     def update_routing(self, weight):
         results = nx.shortest_path(self, weight=weight)
+        self.statistics.current_update += 1
         for node, paths in results.items():
             for target, path in paths.items():
                 if len(path) > 1:
@@ -249,7 +275,6 @@ class NetworkGraph(nx.DiGraph):
                     self.statistics.update_path_change_counter(node, target, current_queue, queue)
                     # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
-        self.statistics.current_update += 1
 
     def initialize_spawners(self):
         for node, attributes in self.node.items():
@@ -257,8 +282,9 @@ class NetworkGraph(nx.DiGraph):
 
     def initialize(self, update_time):
         simpy.events.Process(env, self._update_routing_events(update_time))
-        # simpy.events.Process(env, update_elements_plot(self, self.env.now, self.sim_time,
-        #                                                self.statistics.hl))
+        simpy.events.Process(env, update_elements_plot(self, update_time,
+                                                       self.sim_time,
+                                                       self.statistics.hl))
 
     def _update_routing_events(self, update_time):
         while self.env.now < self.sim_time:
@@ -266,6 +292,7 @@ class NetworkGraph(nx.DiGraph):
             self.update_times()
             self.update_routing('wait_time')
             debug_print('UPDATE ROUTING')
+
 
 def create_big_graph(env, statistics, sim_time, demand_mult):
     new_graph = NetworkGraph(env, statistics, sim_time)
@@ -275,52 +302,52 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
         demand = dict(map(lambda n: (n, float(demand_mult)/10.0), nodes - set([node])))
         new_graph.add_network_node(node, demand)
 
-    new_graph.add_network_double_edge('A', 'B')
-    new_graph.add_network_double_edge('A', 'D')
-    new_graph.add_network_double_edge('A', 'C')
+    new_graph.add_network_double_edge_normalvariate('A', 'B')
+    new_graph.add_network_double_edge_normalvariate('A', 'D')
+    new_graph.add_network_double_edge_normalvariate('A', 'C')
     # new_graph.add_network_double_edge('B', 'A', 8, 1)
-    new_graph.add_network_double_edge('B', 'G')
-    new_graph.add_network_double_edge('B', 'E')
+    new_graph.add_network_double_edge_normalvariate('B', 'G')
+    new_graph.add_network_double_edge_normalvariate('B', 'E')
     # new_graph.add_network_double_edge('C', 'A', 12, 1)
-    new_graph.add_network_double_edge('C', 'H')
-    new_graph.add_network_double_edge('C', 'G')
+    new_graph.add_network_double_edge_normalvariate('C', 'H')
+    new_graph.add_network_double_edge_normalvariate('C', 'G')
     # new_graph.add_network_double_edge('D', 'A', 6, 1)
-    new_graph.add_network_double_edge('D', 'E')
-    new_graph.add_network_double_edge('D', 'F')
-    new_graph.add_network_double_edge('D', 'H')
+    new_graph.add_network_double_edge_normalvariate('D', 'E')
+    new_graph.add_network_double_edge_normalvariate('D', 'F')
+    new_graph.add_network_double_edge_normalvariate('D', 'H')
     # new_graph.add_network_double_edge('E', 'B', 21, 1)
     # new_graph.add_network_double_edge('E', 'D', 10, 1)
-    new_graph.add_network_double_edge('E', 'F')
+    new_graph.add_network_double_edge_normalvariate('E', 'F')
     # new_graph.add_network_double_edge('F', 'D', 7, 1)
     # new_graph.add_network_double_edge('F', 'E', 5, 1)
-    new_graph.add_network_double_edge('F', 'J')
+    new_graph.add_network_double_edge_normalvariate('F', 'J')
     # new_graph.add_network_double_edge('G', 'C', 6, 1)
     # new_graph.add_network_double_edge('G', 'B', 14, 1)
-    new_graph.add_network_double_edge('G', 'L')
+    new_graph.add_network_double_edge_normalvariate('G', 'L')
     # new_graph.add_network_double_edge('H', 'C', 25, 1)
-    new_graph.add_network_double_edge('H', 'L')
-    new_graph.add_network_double_edge('H', 'I')
+    new_graph.add_network_double_edge_normalvariate('H', 'L')
+    new_graph.add_network_double_edge_normalvariate('H', 'I')
     # new_graph.add_network_double_edge('H', 'D', 15, 1)
-    new_graph.add_network_double_edge('I', 'J')
-    new_graph.add_network_double_edge('I', 'K')
+    new_graph.add_network_double_edge_normalvariate('I', 'J')
+    new_graph.add_network_double_edge_normalvariate('I', 'K')
     # new_graph.add_network_double_edge('I', 'H', 11, 1)
     # new_graph.add_network_double_edge('J', 'F', 8, 1)
-    new_graph.add_network_double_edge('J', 'K')
+    new_graph.add_network_double_edge_normalvariate('J', 'K')
     # new_graph.add_network_double_edge('J', 'I', 6, 1)
     # new_graph.add_network_double_edge('K', 'I', 7, 1)
     # new_graph.add_network_double_edge('K', 'J', 10, 1)
-    new_graph.add_network_double_edge('K', 'L')
+    new_graph.add_network_double_edge_normalvariate('K', 'L')
     # new_graph.add_network_double_edge('L', 'G', 5, 1)
     # new_graph.add_network_double_edge('L', 'H', 9, 1)
     # new_graph.add_network_double_edge('L', 'K', 11, 1)
 
     # para que sea 4 conexo:
-    new_graph.add_network_node('B', 'F')
-    new_graph.add_network_node('G', 'J')
-    new_graph.add_network_node('C', 'L')
-    new_graph.add_network_node('A', 'I')
-    new_graph.add_network_node('E', 'H')
-    new_graph.add_network_node('D', 'K')
+    new_graph.add_network_double_edge_normalvariate('B', 'F')
+    new_graph.add_network_double_edge_normalvariate('G', 'J')
+    new_graph.add_network_double_edge_normalvariate('C', 'L')
+    new_graph.add_network_double_edge_normalvariate('A', 'I')
+    new_graph.add_network_double_edge_normalvariate('E', 'H')
+    new_graph.add_network_double_edge_normalvariate('D', 'K')
 
 
     return new_graph
@@ -335,6 +362,7 @@ def create_graph(env, statistics, sim_time):
     new_graph.add_network_double_edge('B', 'C', 10, 1)
     return new_graph
 
+
 def print_routing_status(graph):
     for node, attr in graph.node.items():
         for target, queue in attr['router'].queues.items():
@@ -346,12 +374,13 @@ def run(update_times, sim_time):
     #seed(42)
     env = simpy.Environment()
     statistics = Statistics(env, sim_time)
-    # statistics.init_dynamic_plots()
-    graph = create_big_graph(env, statistics, sim_time, 0.15) # era create_graph
+
+    statistics.init_dynamic_plots()
+    graph = create_big_graph(env, statistics, sim_time, 0.08) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
-        print("Número de Refresco|Desde|Hasta|Por")
+        # print("Número de Refresco|Desde|Hasta|Por")
         graph.initialize(update_times)
     # print_routing_status(graph)
     graph.initialize_spawners()
@@ -375,13 +404,18 @@ def run_batch(update_time, batch_size):
         avg_path_change += avg_pchg
     return t_means / batch_size, avg_path_change / batch_size
 
+
 def print_to_file(line):
     f = open('output.csv', 'a')
     f.write(line + '\n')
     f.close()
 
-def update_elements_plot(g, curr_time, sim_time, hl):
+
+def update_elements_plot(g, update_time, sim_time, hl):
     edges_dict = g.edge
+    ax1, ax2, ax3 = hl.get_axes()
+    str = "Frec. Refres.: %.2f" % (1 / update_time)
+    plt.text(0, 1.1, str, fontsize=12, transform=ax1.transAxes)
     while env.now < sim_time:
         yield env.timeout(1)
 
@@ -390,14 +424,30 @@ def update_elements_plot(g, curr_time, sim_time, hl):
         for origin in edges_dict.keys():
             for dest in edges_dict.get(origin):
                 elements += len(g.get_edge_data(origin, dest)['queue'].queue)
+        line = ax1.get_lines()[0]
+        xs = np.append(line.get_xdata(), env.now)
+        ys = np.append(line.get_ydata(), elements)
+        max_x = int(max(xs) * 1.2)
+        ax1.set_xlim([0, max_x])
+        ax1.set_ylim([0, int(max(ys) * 1.2)])
+        line.set_xdata(xs)
+        line.set_ydata(ys)
 
-        # print("t: %f, elements: %d" % (env.now, elements))
-        xs = np.append(hl.get_xdata(), env.now)
-        ys = np.append(hl.get_ydata(), elements)
+        line = ax2.get_lines()[0]
+        ys = np.append(line.get_ydata(), g.statistics.get_total_avg_delay())
+        ax2.set_xlim([0, max_x])
+        ax2.set_ylim([0, max(ys) * 1.2])
+        line.set_xdata(xs)
+        line.set_ydata(ys)
 
-        hl.set_xdata(xs)
-        hl.set_ydata(ys)
-        plt.pause(0.01)
+        line = ax3.get_lines()[0]
+        ys = np.append(line.get_ydata(), g.statistics.get_avg_path_change())
+        ax3.set_xlim([0, max_x])
+        ax3.set_ylim([0, max(ys) * 1.2])
+        line.set_xdata(xs)
+        line.set_ydata(ys)
+
+        plt.pause(0.001)
     plt.clf()
 
 if __name__ == '__main__':
