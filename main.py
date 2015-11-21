@@ -47,20 +47,21 @@ class Statistics(object):
 
         fig.add_subplot(311)
         ax = fig.gca()
-        # ax.set_xlabel("Tiempo del simulador")
         ax.set_ylabel("Cantidad de elementos")
+        ax.grid(True)
         plt.plot([], [], 'b-')
 
         fig.add_subplot(312)
         ax = fig.gca()
-        # ax.set_xlabel("Tiempo del simulador")
         ax.set_ylabel("Tiempo en el sistema")
+        ax.grid(True)
         plt.plot([], [], 'b-')
 
         fig.add_subplot(313)
         ax = fig.gca()
         ax.set_xlabel("Tiempo del simulador")
         ax.set_ylabel("Cambios en el ruteo")
+        ax.grid(True)
         plt.plot([], [], 'b-')
 
         fig.subplots_adjust(hspace=0)
@@ -108,13 +109,15 @@ class Statistics(object):
             if self.current_update not in self.change_count_matrix:
                 self.change_count_matrix[self.current_update] = 0
             self.change_count_matrix[self.current_update] += 1
-            print('{:^18d} {:^5s} {:^5s} {:^3s}'.format(self.current_update, node, target, queue1.next_node))
+            # print('{:^18d} {:^5s} {:^5s} {:^3s}'.format(self.current_update, node, target, queue1.next_node))
 
     def get_avg_path_change(self):
-        n = len(self.change_count_matrix)
-        if n != 0:
-            return sum(self.change_count_matrix.values()) / n
-        return 0
+        # n = len(self.change_count_matrix)
+        # if n != 0:
+        #     return sum(self.change_count_matrix.values()) / n
+        if self.current_update not in self.change_count_matrix:
+            self.change_count_matrix[self.current_update] = 0
+        return self.change_count_matrix[self.current_update]
 
     def get_total_avg_delay(self):
         total_arrivals = sum(self.arrived_matrix.values())
@@ -254,6 +257,7 @@ class NetworkGraph(nx.DiGraph):
 
     def update_routing(self, weight):
         results = nx.shortest_path(self, weight=weight)
+        self.statistics.current_update += 1
         for node, paths in results.items():
             for target, path in paths.items():
                 if len(path) > 1:
@@ -265,7 +269,6 @@ class NetworkGraph(nx.DiGraph):
                     self.statistics.update_path_change_counter(node, target, current_queue, queue)
                     # plot_routing_table(self.statistics)
                     debug_print(node, target, path)
-        self.statistics.current_update += 1
 
     def initialize_spawners(self):
         for node, attributes in self.node.items():
@@ -273,7 +276,8 @@ class NetworkGraph(nx.DiGraph):
 
     def initialize(self, update_time):
         simpy.events.Process(env, self._update_routing_events(update_time))
-        simpy.events.Process(env, update_elements_plot(self, self.env.now, self.sim_time,
+        simpy.events.Process(env, update_elements_plot(self, update_time,
+                                                       self.sim_time,
                                                        self.statistics.hl))
 
     def _update_routing_events(self, update_time):
@@ -376,11 +380,11 @@ def run(update_times, sim_time):
     env = simpy.Environment()
     statistics = Statistics(env, sim_time)
     statistics.init_dynamic_plots()
-    graph = create_big_graph(env, statistics, sim_time, 0.13) # era create_graph
+    graph = create_big_graph(env, statistics, sim_time, 0.08) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
-        print("Número de Refresco|Desde|Hasta|Por")
+        # print("Número de Refresco|Desde|Hasta|Por")
         graph.initialize(update_times)
     # print_routing_status(graph)
     graph.initialize_spawners()
@@ -395,19 +399,21 @@ def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
     for k in range(batch_size):
-        mean, avg_pchg = run(update_time, 200) # decia 20000
+        mean, avg_pchg = run(update_time, 500) # decia 20000
         #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         t_means += mean
         avg_path_change += avg_pchg
     return t_means / batch_size, avg_path_change / batch_size
 
 
-def update_elements_plot(g, curr_time, sim_time, hl):
+def update_elements_plot(g, update_time, sim_time, hl):
     edges_dict = g.edge
+    ax1, ax2, ax3 = hl.get_axes()
+    str = "Frec. Refres.: %.2f" % (1 / update_time)
+    plt.text(0, 1.1, str, fontsize=12, transform=ax1.transAxes)
     while env.now < sim_time:
         yield env.timeout(1)
 
-        ax1, ax2, ax3 = hl.get_axes()
         elements = 0
         for origin in edges_dict.keys():
             for dest in edges_dict.get(origin):
@@ -435,7 +441,7 @@ def update_elements_plot(g, curr_time, sim_time, hl):
         line.set_xdata(xs)
         line.set_ydata(ys)
 
-        plt.pause(0.01)
+        plt.pause(0.001)
     plt.clf()
 
 if __name__ == '__main__':
@@ -455,7 +461,7 @@ if __name__ == '__main__':
 
     inf_mean = run_batch(None, 50)
     for t in range(1, 300, 10): # decia (1, 800, 10)
-        t_mean, path_change = run_batch(t, 20)
+        t_mean, path_change = run_batch(t, 1)
         x.append(t)
         y.append(t_mean)
         z.append(path_change)
