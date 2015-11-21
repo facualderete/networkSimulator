@@ -14,12 +14,14 @@ import numpy as np
 
 def exponential_var_gen(var_lambda):
     while True:
-        yield round(expovariate(var_lambda))
+        val = round(expovariate(var_lambda))
+        yield val if val > 0 else 1
 
 
 def normal_var_gen(var_mu, var_sigma):
     while True:
-        yield round(normalvariate(var_mu, var_sigma))
+        val = round(normalvariate(var_mu, var_sigma))
+        yield val if val > 0 else 1
 
 
 def debug_print(*args):
@@ -250,11 +252,11 @@ class NetworkGraph(nx.DiGraph):
         self.add_network_edge(u, v, mu, sigma)
         self.add_network_edge(v, u, mu, sigma)
 
-    def add_network_double_edge_normalvariate(self, u, v):
-        mean = normalvariate(35, 16)
-        print(mean)
-        dev = 4
-        self.add_network_double_edge(u, v, mean, dev)
+    # def add_network_double_edge_normalvariate(self, u, v):
+    #     mean = normalvariate(35, 16)
+    #     print(mean)
+    #     dev = 4
+    #     self.add_network_double_edge(u, v, mean, dev)
 
     def update_times(self):
         for (u, v) in self.edges():
@@ -302,54 +304,31 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
         demand = dict(map(lambda n: (n, float(demand_mult)/10.0), nodes - set([node])))
         new_graph.add_network_node(node, demand)
 
-    new_graph.add_network_double_edge_normalvariate('A', 'B')
-    new_graph.add_network_double_edge_normalvariate('A', 'D')
-    new_graph.add_network_double_edge_normalvariate('A', 'C')
-    # new_graph.add_network_double_edge('B', 'A', 8, 1)
-    new_graph.add_network_double_edge_normalvariate('B', 'G')
-    new_graph.add_network_double_edge_normalvariate('B', 'E')
-    # new_graph.add_network_double_edge('C', 'A', 12, 1)
-    new_graph.add_network_double_edge_normalvariate('C', 'H')
-    new_graph.add_network_double_edge_normalvariate('C', 'G')
-    # new_graph.add_network_double_edge('D', 'A', 6, 1)
-    new_graph.add_network_double_edge_normalvariate('D', 'E')
-    new_graph.add_network_double_edge_normalvariate('D', 'F')
-    new_graph.add_network_double_edge_normalvariate('D', 'H')
-    # new_graph.add_network_double_edge('E', 'B', 21, 1)
-    # new_graph.add_network_double_edge('E', 'D', 10, 1)
-    new_graph.add_network_double_edge_normalvariate('E', 'F')
-    # new_graph.add_network_double_edge('F', 'D', 7, 1)
-    # new_graph.add_network_double_edge('F', 'E', 5, 1)
-    new_graph.add_network_double_edge_normalvariate('F', 'J')
-    # new_graph.add_network_double_edge('G', 'C', 6, 1)
-    # new_graph.add_network_double_edge('G', 'B', 14, 1)
-    new_graph.add_network_double_edge_normalvariate('G', 'L')
-    # new_graph.add_network_double_edge('H', 'C', 25, 1)
-    new_graph.add_network_double_edge_normalvariate('H', 'L')
-    new_graph.add_network_double_edge_normalvariate('H', 'I')
-    # new_graph.add_network_double_edge('H', 'D', 15, 1)
-    new_graph.add_network_double_edge_normalvariate('I', 'J')
-    new_graph.add_network_double_edge_normalvariate('I', 'K')
-    # new_graph.add_network_double_edge('I', 'H', 11, 1)
-    # new_graph.add_network_double_edge('J', 'F', 8, 1)
-    new_graph.add_network_double_edge_normalvariate('J', 'K')
-    # new_graph.add_network_double_edge('J', 'I', 6, 1)
-    # new_graph.add_network_double_edge('K', 'I', 7, 1)
-    # new_graph.add_network_double_edge('K', 'J', 10, 1)
-    new_graph.add_network_double_edge_normalvariate('K', 'L')
-    # new_graph.add_network_double_edge('L', 'G', 5, 1)
-    # new_graph.add_network_double_edge('L', 'H', 9, 1)
-    # new_graph.add_network_double_edge('L', 'K', 11, 1)
-
-    # para que sea 4 conexo:
-    new_graph.add_network_double_edge_normalvariate('B', 'F')
-    new_graph.add_network_double_edge_normalvariate('G', 'J')
-    new_graph.add_network_double_edge_normalvariate('C', 'L')
-    new_graph.add_network_double_edge_normalvariate('A', 'I')
-    new_graph.add_network_double_edge_normalvariate('E', 'H')
-    new_graph.add_network_double_edge_normalvariate('D', 'K')
-
-
+    new_graph.add_network_double_edge('A', 'B', 26.66601928, 4)
+    new_graph.add_network_double_edge('A', 'D', 55.82490321, 4)
+    new_graph.add_network_double_edge('A', 'C', 47.45599816, 4)
+    new_graph.add_network_double_edge('B', 'G', 32.19176764, 4)
+    new_graph.add_network_double_edge('B', 'E', 38.59553264, 4)
+    new_graph.add_network_double_edge('C', 'H', 33.66681702, 4)
+    new_graph.add_network_double_edge('C', 'G', 61.57265026, 4)
+    new_graph.add_network_double_edge('D', 'E', 29.11873884, 4)
+    new_graph.add_network_double_edge('D', 'F', 34.38013852, 4)
+    new_graph.add_network_double_edge('D', 'H', 51.2799343 , 4)
+    new_graph.add_network_double_edge('E', 'F', 34.42083136, 4)
+    new_graph.add_network_double_edge('F', 'J', 8.8372192 , 4)
+    new_graph.add_network_double_edge('G', 'L', 46.57559621, 4)
+    new_graph.add_network_double_edge('H', 'L', 38.73164033, 4)
+    new_graph.add_network_double_edge('H', 'I', 39.31513441, 4)
+    new_graph.add_network_double_edge('I', 'J', 41.85763454, 4)
+    new_graph.add_network_double_edge('I', 'K', 22.06361164, 4)
+    new_graph.add_network_double_edge('J', 'K', 12.84305457, 4)
+    new_graph.add_network_double_edge('K', 'L', 36.67610692, 4)
+    new_graph.add_network_double_edge('B', 'F', 48.20171453, 4)
+    new_graph.add_network_double_edge('G', 'J', 8.65775791, 4)
+    new_graph.add_network_double_edge('C', 'L', 35.76520396, 4)
+    new_graph.add_network_double_edge('A', 'I', 26.4440966 , 4)
+    new_graph.add_network_double_edge('E', 'H', 8.58754983, 4)
+    new_graph.add_network_double_edge('D', 'K', 8.31042608, 4)
     return new_graph
 
 def create_graph(env, statistics, sim_time):
