@@ -85,11 +85,15 @@ class Statistics(object):
         self.demand_matrix[(origin, destination)] += 1
 
     def add_delay_count(self, origin, destination, delay):
+        if self.current_update < 400:
+            return
         if not (origin, destination) in self.delay_matrix:
             self.delay_matrix[(origin, destination)] = 0
         self.delay_matrix[(origin, destination)] += delay
 
     def add_arrived_count(self, origin, destination):
+        if self.current_update < 400:
+            return
         if not (origin, destination) in self.arrived_matrix:
             self.arrived_matrix[(origin, destination)] = 0
         self.arrived_matrix[(origin, destination)] += 1
@@ -355,7 +359,7 @@ def run(update_times, sim_time):
     statistics = Statistics(env, sim_time)
 
     statistics.init_dynamic_plots()
-    graph = create_big_graph(env, statistics, sim_time, 0.08) # era create_graph
+    graph = create_big_graph(env, statistics, sim_time, 0.03) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
@@ -374,7 +378,7 @@ def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
     for k in range(batch_size):
-        mean, avg_pchg = run(update_time, 500) # decia 20000
+        mean, avg_pchg = run(update_time, 700) # decia 20000
         #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         # acá imprimir mean (es el tiempo promedio de viaje de la corrida) y 1/updade_time
         if update_time is not None:
