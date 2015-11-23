@@ -45,6 +45,7 @@ class Statistics(object):
         self.current_update = 0
         self.hl = []  # used for plotting
         self.sim_time = sim_time
+        self.warmup_updates = 250
 
     def init_dynamic_plots(self):
         fig = plt.figure(1)
@@ -91,11 +92,15 @@ class Statistics(object):
         self.demand_matrix[(origin, destination)] += 1
 
     def add_delay_count(self, origin, destination, delay):
+        if self.current_update < self.warmup_updates:
+            return
         if not (origin, destination) in self.delay_matrix:
             self.delay_matrix[(origin, destination)] = 0
         self.delay_matrix[(origin, destination)] += delay
 
     def add_arrived_count(self, origin, destination):
+        if self.current_update < self.warmup_updates:
+            return
         if not (origin, destination) in self.arrived_matrix:
             self.arrived_matrix[(origin, destination)] = 0
         self.arrived_matrix[(origin, destination)] += 1
@@ -385,7 +390,7 @@ def run_batch(update_time, batch_size):
     for k in range(batch_size):
         if update_time is not None:
             print(k)
-        mean, avg_pchg = run(update_time, 500) # decia 20000
+        mean, avg_pchg = run(update_time, 700) # decia 20000
         #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         # acá imprimir mean (es el tiempo promedio de viaje de la corrida) y 1/updade_time
         if update_time is not None:
