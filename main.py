@@ -12,6 +12,9 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
+PLOT_RESULTS = False
+
+
 def exponential_var_gen(var_lambda):
     while True:
         val = round(expovariate(var_lambda))
@@ -287,9 +290,9 @@ class NetworkGraph(nx.DiGraph):
 
     def initialize(self, update_time):
         simpy.events.Process(env, self._update_routing_events(update_time))
-        simpy.events.Process(env, update_elements_plot(self, update_time,
-                                                       self.sim_time,
-                                                       self.statistics.hl))
+        #simpy.events.Process(env, update_elements_plot(self, update_time,
+        #                                               self.sim_time,
+        #                                               self.statistics.hl))
 
     def _update_routing_events(self, update_time):
         while self.env.now < self.sim_time:
@@ -357,7 +360,8 @@ def run(update_times, sim_time):
     env = simpy.Environment()
     statistics = Statistics(env, sim_time)
 
-    statistics.init_dynamic_plots()
+    if PLOT_RESULTS:
+        statistics.init_dynamic_plots()
     graph = create_big_graph(env, statistics, sim_time, 0.03) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
@@ -376,7 +380,11 @@ def run(update_times, sim_time):
 def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
+    if update_time is not None:
+        print("Running with update time %d and batch size %d" % (update_time, batch_size))
     for k in range(batch_size):
+        if update_time is not None:
+            print(k)
         mean, avg_pchg = run(update_time, 500) # decia 20000
         #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         # acá imprimir mean (es el tiempo promedio de viaje de la corrida) y 1/updade_time
@@ -444,21 +452,22 @@ if __name__ == '__main__':
         print(t, t_mean)
         print("Path change: %f, %f" % (t, path_change))
 
-    x = np.array(x)
-    y = np.array(y)
-    yinf = np.array([inf_mean]*len(x))
-    plt.figure(1)
-    plt.subplot(211)
-    plt.plot(x, y, 'o')
-    plt.grid(True)
-    plt.xlabel("Tiempo de refresco")
-    plt.ylabel("Tiempo promedio en el sistema")
-    plt.title("Tiempo en el sistema de cada mensaje en función del refresco")
+    if PLOT_RESULTS:
+        x = np.array(x)
+        y = np.array(y)
+        yinf = np.array([inf_mean]*len(x))
+        plt.figure(1)
+        plt.subplot(211)
+        plt.plot(x, y, 'o')
+        plt.grid(True)
+        plt.xlabel("Tiempo de refresco")
+        plt.ylabel("Tiempo promedio en el sistema")
+        plt.title("Tiempo en el sistema de cada mensaje en función del refresco")
 
-    plt.subplot(212)
-    plt.plot(x, z, 'x')
-    plt.grid(True)
-    plt.xlabel("Tiempo de refresco")
-    plt.ylabel("Cambio promedio en el routeo")
-    plt.show()
-    print(inf_mean)
+        plt.subplot(212)
+        plt.plot(x, z, 'x')
+        plt.grid(True)
+        plt.xlabel("Tiempo de refresco")
+        plt.ylabel("Cambio promedio en el routeo")
+        plt.show()
+        print(inf_mean)
