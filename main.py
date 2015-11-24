@@ -13,17 +13,21 @@ import numpy as np
 
 
 PLOT_RESULTS = False
+DEFAULT_LAMBDA = 0.01 # ms/msg
+BATCH_SIZE = 20
+RUNS = 700
+WARM_UP_PERIOD = 0
 
 
 def exponential_var_gen(var_lambda):
     while True:
-        val = round(expovariate(var_lambda))
+        val = expovariate(var_lambda)
         yield val if val > 0 else 1
 
 
 def normal_var_gen(var_mu, var_sigma):
     while True:
-        val = round(normalvariate(var_mu, var_sigma))
+        val = normalvariate(var_mu, var_sigma)
         yield val if val > 0 else 1
 
 
@@ -45,7 +49,7 @@ class Statistics(object):
         self.current_update = 0
         self.hl = []  # used for plotting
         self.sim_time = sim_time
-        self.warmup_updates = 250
+        self.warmup_updates = WARM_UP_PERIOD
 
     def init_dynamic_plots(self):
         fig = plt.figure(1)
@@ -55,14 +59,14 @@ class Statistics(object):
         ax = fig.gca()
         ax.set_ylabel("Cantidad de elementos")
         ax.grid(True)
-        ax.set_xlim([0, 520])
+        ax.set_xlim([self.warmup_updates, RUNS])
         plt.plot([], [], 'b-')
 
         fig.add_subplot(312)
         ax = fig.gca()
         ax.set_ylabel("Tiempo en el sistema")
         ax.grid(True)
-        ax.set_xlim([0, 520])
+        ax.set_xlim([self.warmup_updates, RUNS])
         plt.plot([], [], 'b-')
 
         fig.add_subplot(313)
@@ -70,7 +74,7 @@ class Statistics(object):
         ax.set_xlabel("Tiempo del simulador")
         ax.set_ylabel("Cambios en el routeo")
         ax.grid(True)
-        ax.set_xlim([0, 520])
+        ax.set_xlim([self.warmup_updates, RUNS])
         plt.plot([], [], 'b-')
 
         fig.subplots_adjust(hspace=0)
@@ -125,9 +129,6 @@ class Statistics(object):
             # print('{:^18d} {:^5s} {:^5s} {:^3s}'.format(self.current_update, node, target, queue1.next_node))
 
     def get_avg_path_change(self):
-        # n = len(self.change_count_matrix)
-        # if n != 0:
-        #     return sum(self.change_count_matrix.values()) / n
         if self.current_update not in self.change_count_matrix:
             self.change_count_matrix[self.current_update] = 0
         return self.change_count_matrix[self.current_update]
@@ -199,6 +200,8 @@ class MessageSpawner(object):
         self.sim_time = sim_time
 
     def initialize(self):
+        if self.origin != "A":
+            return
         for destination, spawn_times in self.demand.items():
             simpy.events.Process(env, self._trigger(destination, spawn_times))
 
@@ -263,12 +266,6 @@ class NetworkGraph(nx.DiGraph):
         self.add_network_edge(u, v, mu, sigma)
         self.add_network_edge(v, u, mu, sigma)
 
-    # def add_network_double_edge_normalvariate(self, u, v):
-    #     mean = normalvariate(35, 16)
-    #     print(mean)
-    #     dev = 4
-    #     self.add_network_double_edge(u, v, mean, dev)
-
     def update_times(self):
         for (u, v) in self.edges():
             attrs = self.edge[u][v]
@@ -295,9 +292,9 @@ class NetworkGraph(nx.DiGraph):
 
     def initialize(self, update_time):
         simpy.events.Process(env, self._update_routing_events(update_time))
-        #simpy.events.Process(env, update_elements_plot(self, update_time,
-        #                                               self.sim_time,
-        #                                               self.statistics.hl))
+        if PLOT_RESULTS:
+            callback = update_elements_plot(self, update_time, self.sim_time, self.statistics.hl)
+            simpy.events.Process(env, callback)
 
     def _update_routing_events(self, update_time):
         while self.env.now < self.sim_time:
@@ -312,7 +309,7 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
     nodes = set([chr(ord('A') + j) for j in range(12)])
 
     for node in nodes:
-        demand = dict(map(lambda n: (n, float(demand_mult)/10.0), nodes - set([node])))
+        demand = dict(map(lambda n: (n, float(demand_mult)), nodes - set([node])))
         new_graph.add_network_node(node, demand)
 
     new_graph.add_network_double_edge('A', 'B', 26, 4)
@@ -334,12 +331,14 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
     new_graph.add_network_double_edge('I', 'K', 22, 4)
     new_graph.add_network_double_edge('J', 'K', 12, 4)
     new_graph.add_network_double_edge('K', 'L', 36, 4)
-    new_graph.add_network_double_edge('B', 'F', 48, 4)
-    new_graph.add_network_double_edge('G', 'J', 8, 4)
-    new_graph.add_network_double_edge('C', 'L', 35, 4)
-    new_graph.add_network_double_edge('A', 'I', 26, 4)
-    new_graph.add_network_double_edge('E', 'H', 8, 4)
-    new_graph.add_network_double_edge('D', 'K', 8, 4)
+
+    # Para hacer el grafo 4-conexo agregar estos
+    #new_graph.add_network_double_edge('B', 'F', 48, 4)
+    #new_graph.add_network_double_edge('G', 'J', 8, 4)
+    #new_graph.add_network_double_edge('C', 'L', 35, 4)
+    #new_graph.add_network_double_edge('A', 'I', 26, 4)
+    #new_graph.add_network_double_edge('E', 'H', 8, 4)
+    #new_graph.add_network_double_edge('D', 'K', 8, 4)
     return new_graph
 
 def create_graph(env, statistics, sim_time):
@@ -361,13 +360,13 @@ def print_routing_status(graph):
 
 def run(update_times, sim_time):
     global env
-    #seed(42)
     env = simpy.Environment()
     statistics = Statistics(env, sim_time)
 
     if PLOT_RESULTS:
         statistics.init_dynamic_plots()
-    graph = create_big_graph(env, statistics, sim_time, 0.03) # era create_graph
+
+    graph = create_big_graph(env, statistics, sim_time, DEFAULT_LAMBDA) # era create_graph
     graph.update_times()
     graph.update_routing("wait_time")
     if update_times is not None:
@@ -390,7 +389,7 @@ def run_batch(update_time, batch_size):
     for k in range(batch_size):
         if update_time is not None:
             print(k)
-        mean, avg_pchg = run(update_time, 700) # decia 20000
+        mean, avg_pchg = run(update_time, RUNS) # decia 20000
         #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         # acá imprimir mean (es el tiempo promedio de viaje de la corrida) y 1/updade_time
         if update_time is not None:
@@ -450,7 +449,7 @@ if __name__ == '__main__':
 
     inf_mean = run_batch(None, 50)
     for t in range(1, 300, 10): # decia (1, 800, 10)
-        t_mean, path_change = run_batch(t, 20)
+        t_mean, path_change = run_batch(t, BATCH_SIZE)
         x.append(t)
         y.append(t_mean)
         z.append(path_change)
