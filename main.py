@@ -3,6 +3,7 @@ import simpy
 import time
 from collections import deque
 from random import expovariate, normalvariate, choice, seed
+from statistics import mean
 
 import sys
 if sys.platform == 'linux':
@@ -19,7 +20,8 @@ WARM_UP_PERIOD = 250
 AVG_TIME_BETWEEN_MSG = 100
 DEFAULT_LAMBDA = 1 / AVG_TIME_BETWEEN_MSG  # ms/msg
 WARM_UP_PERIOD = 250
-FREQUENCY_STEP = 0.2
+FREQUENCY_STEP = 0.05
+DATA = {}
 
 
 def exponential_var_gen(var_lambda):
@@ -203,7 +205,7 @@ class MessageSpawner(object):
         self.sim_time = sim_time
 
     def initialize(self):
-        if self.origin != "A":
+        if self.origin not in ["A", "B", "D", "E", "F"]:
             return
         for destination, spawn_times in self.demand.items():
             simpy.events.Process(env, self._trigger(destination, spawn_times))
@@ -316,25 +318,46 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
         demand = dict(map(lambda n: (n, float(demand_mult)), nodes - set([node])))
         new_graph.add_network_node(node, demand)
 
-    new_graph.add_network_double_edge('A', 'B', 26, 4)
-    new_graph.add_network_double_edge('A', 'D', 55, 4)
-    new_graph.add_network_double_edge('A', 'C', 47, 4)
-    new_graph.add_network_double_edge('B', 'G', 32, 4)
-    new_graph.add_network_double_edge('B', 'E', 38, 4)
-    new_graph.add_network_double_edge('C', 'H', 33, 4)
-    new_graph.add_network_double_edge('C', 'G', 61, 4)
-    new_graph.add_network_double_edge('D', 'E', 29, 4)
-    new_graph.add_network_double_edge('D', 'F', 34, 4)
-    new_graph.add_network_double_edge('D', 'H', 51, 4)
-    new_graph.add_network_double_edge('E', 'F', 34, 4)
-    new_graph.add_network_double_edge('F', 'J', 8, 4)
-    new_graph.add_network_double_edge('G', 'L', 46, 4)
-    new_graph.add_network_double_edge('H', 'L', 38, 4)
-    new_graph.add_network_double_edge('H', 'I', 39, 4)
-    new_graph.add_network_double_edge('I', 'J', 41, 4)
-    new_graph.add_network_double_edge('I', 'K', 22, 4)
-    new_graph.add_network_double_edge('J', 'K', 12, 4)
-    new_graph.add_network_double_edge('K', 'L', 36, 4)
+    # new_graph.add_network_double_edge('A', 'B', 26, 4)
+    # new_graph.add_network_double_edge('A', 'D', 55, 4)
+    # new_graph.add_network_double_edge('A', 'C', 47, 4)
+    # new_graph.add_network_double_edge('B', 'G', 32, 4)
+    # new_graph.add_network_double_edge('B', 'E', 38, 4)
+    # new_graph.add_network_double_edge('C', 'H', 33, 4)
+    # new_graph.add_network_double_edge('C', 'G', 61, 4)
+    # new_graph.add_network_double_edge('D', 'E', 29, 4)
+    # new_graph.add_network_double_edge('D', 'F', 34, 4)
+    # new_graph.add_network_double_edge('D', 'H', 51, 4)
+    # new_graph.add_network_double_edge('E', 'F', 34, 4)
+    # new_graph.add_network_double_edge('F', 'J', 8, 4)
+    # new_graph.add_network_double_edge('G', 'L', 46, 4)
+    # new_graph.add_network_double_edge('H', 'L', 38, 4)
+    # new_graph.add_network_double_edge('H', 'I', 39, 4)
+    # new_graph.add_network_double_edge('I', 'J', 41, 4)
+    # new_graph.add_network_double_edge('I', 'K', 22, 4)
+    # new_graph.add_network_double_edge('J', 'K', 12, 4)
+    # new_graph.add_network_double_edge('K', 'L', 36, 4)
+
+    # Original Graph
+    new_graph.add_network_double_edge_normalvariate('A', 'B')
+    new_graph.add_network_double_edge_normalvariate('A', 'C')
+    new_graph.add_network_double_edge_normalvariate('A', 'D')
+    new_graph.add_network_double_edge_normalvariate('B', 'E')
+    new_graph.add_network_double_edge_normalvariate('B', 'G')
+    new_graph.add_network_double_edge_normalvariate('C', 'G')
+    new_graph.add_network_double_edge_normalvariate('C', 'H')
+    new_graph.add_network_double_edge_normalvariate('D', 'E')
+    new_graph.add_network_double_edge_normalvariate('D', 'F')
+    new_graph.add_network_double_edge_normalvariate('D', 'H')
+    new_graph.add_network_double_edge_normalvariate('E', 'F')
+    new_graph.add_network_double_edge_normalvariate('F', 'J')
+    new_graph.add_network_double_edge_normalvariate('G', 'L')
+    new_graph.add_network_double_edge_normalvariate('H', 'I')
+    new_graph.add_network_double_edge_normalvariate('H', 'L')
+    new_graph.add_network_double_edge_normalvariate('I', 'J')
+    new_graph.add_network_double_edge_normalvariate('I', 'K')
+    new_graph.add_network_double_edge_normalvariate('J', 'K')
+    new_graph.add_network_double_edge_normalvariate('K', 'L')
 
     # Para hacer el grafo 4-conexo agregar estos
     #new_graph.add_network_double_edge('B', 'F', 48, 4)
@@ -344,6 +367,7 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
     #new_graph.add_network_double_edge('E', 'H', 8, 4)
     #new_graph.add_network_double_edge('D', 'K', 8, 4)
     return new_graph
+
 
 
 def create_graph(env, statistics, sim_time):
@@ -387,6 +411,7 @@ def run(update_times, sim_time):
 
 
 def run_batch(update_time, batch_size):
+    global DATA
     t_means = 0
     avg_path_change = 0
     if update_time is not None:
@@ -399,7 +424,10 @@ def run_batch(update_time, batch_size):
         #mean, avg_pchg = run(update_time, 100 + (update_time if update_time is not None else 0)*10) # decia 20000
         # acá imprimir mean (es el tiempo promedio de viaje de la corrida) y 1/updade_time
         if update_time is not None:
-            print_to_file(str(1/update_time)+";"+str(mean))
+            freq = 1 / update_time
+            if freq not in DATA:
+                DATA[freq] = []
+            DATA[freq].append(mean)
         t_means += mean
         avg_path_change += avg_pchg
     return t_means / batch_size, avg_path_change / batch_size
@@ -461,6 +489,9 @@ if __name__ == '__main__':
         z.append(path_change)
         print(t, t_mean)
         print("Path change: %f, %f" % (t, path_change))
+
+    for freq, values in DATA.items():
+        print(freq, mean(values))
 
     if PLOT_RESULTS:
         x = np.array(x)
