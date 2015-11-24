@@ -13,10 +13,11 @@ import numpy as np
 
 
 PLOT_RESULTS = False
-DEFAULT_LAMBDA = 0.01 # ms/msg
 BATCH_SIZE = 20
 RUNS = 700
 WARM_UP_PERIOD = 0
+AVG_TIME_BETWEEN_MSG = 100
+DEFAULT_LAMBDA = 1 / AVG_TIME_BETWEEN_MSG  # ms/msg
 
 
 def exponential_var_gen(var_lambda):
@@ -385,6 +386,7 @@ def run_batch(update_time, batch_size):
     t_means = 0
     avg_path_change = 0
     if update_time is not None:
+        update_time = 1 / update_time
         print("Running with update time %d and batch size %d" % (update_time, batch_size))
     for k in range(batch_size):
         if update_time is not None:
@@ -448,7 +450,7 @@ if __name__ == '__main__':
     print_to_file("frequency; avg_travel_time")
 
     inf_mean = run_batch(None, 50)
-    for t in range(1, 300, 10): # decia (1, 800, 10)
+    for t in np.arange(1, 0, -0.1): # decia (1, 800, 10)
         t_mean, path_change = run_batch(t, BATCH_SIZE)
         x.append(t)
         y.append(t_mean)
