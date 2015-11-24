@@ -14,13 +14,16 @@ import numpy as np
 
 
 PLOT_RESULTS = False
-BATCH_SIZE = 11
+if not PLOT_RESULTS:
+    BATCH_SIZE = 54
+else:
+    BATCH_SIZE = 1
 RUNS = 700
 WARM_UP_PERIOD = 250
-AVG_TIME_BETWEEN_MSG = 100
+AVG_TIME_BETWEEN_MSG = 10
 DEFAULT_LAMBDA = 1 / AVG_TIME_BETWEEN_MSG  # ms/msg
 WARM_UP_PERIOD = 250
-FREQUENCY_STEP = 0.05
+FREQUENCY_STEP = 0.025
 DATA = {}
 
 
@@ -205,8 +208,8 @@ class MessageSpawner(object):
         self.sim_time = sim_time
 
     def initialize(self):
-        if self.origin not in ["A", "B", "D", "E", "F"]:
-            return
+        # if self.origin not in ["A", "B", "D", "E", "F"]:
+            # return
         for destination, spawn_times in self.demand.items():
             simpy.events.Process(env, self._trigger(destination, spawn_times))
 
