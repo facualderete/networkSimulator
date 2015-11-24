@@ -19,6 +19,7 @@ WARM_UP_PERIOD = 0
 AVG_TIME_BETWEEN_MSG = 100
 DEFAULT_LAMBDA = 1 / AVG_TIME_BETWEEN_MSG  # ms/msg
 WARM_UP_PERIOD = 250
+FREQUENCY_STEP = 0.2
 
 
 def exponential_var_gen(var_lambda):
@@ -453,7 +454,7 @@ if __name__ == '__main__':
     print_to_file("frequency; avg_travel_time")
 
     inf_mean = run_batch(None, 50)
-    for t in np.arange(1, 0, -0.1): # decia (1, 800, 10)
+    for t in np.arange(1, 0, -FREQUENCY_STEP): # decia (1, 800, 10)
         t_mean, path_change = run_batch(t, BATCH_SIZE)
         x.append(t)
         y.append(t_mean)
