@@ -13,11 +13,12 @@ import numpy as np
 
 
 PLOT_RESULTS = False
-BATCH_SIZE = 20
+BATCH_SIZE = 5
 RUNS = 700
 WARM_UP_PERIOD = 0
 AVG_TIME_BETWEEN_MSG = 100
 DEFAULT_LAMBDA = 1 / AVG_TIME_BETWEEN_MSG  # ms/msg
+WARM_UP_PERIOD = 250
 
 
 def exponential_var_gen(var_lambda):
@@ -97,14 +98,14 @@ class Statistics(object):
         self.demand_matrix[(origin, destination)] += 1
 
     def add_delay_count(self, origin, destination, delay):
-        if self.current_update < self.warmup_updates:
+        if self.sim_time< self.warmup_updates:
             return
         if not (origin, destination) in self.delay_matrix:
             self.delay_matrix[(origin, destination)] = 0
         self.delay_matrix[(origin, destination)] += delay
 
     def add_arrived_count(self, origin, destination):
-        if self.current_update < self.warmup_updates:
+        if self.sim_time < self.warmup_updates:
             return
         if not (origin, destination) in self.arrived_matrix:
             self.arrived_matrix[(origin, destination)] = 0
@@ -275,6 +276,7 @@ class NetworkGraph(nx.DiGraph):
     def update_routing(self, weight):
         results = nx.shortest_path(self, weight=weight)
         self.statistics.current_update += 1
+        # print("current update" + str(self.statistics.current_update))
         for node, paths in results.items():
             for target, path in paths.items():
                 if len(path) > 1:
@@ -341,6 +343,7 @@ def create_big_graph(env, statistics, sim_time, demand_mult):
     #new_graph.add_network_double_edge('E', 'H', 8, 4)
     #new_graph.add_network_double_edge('D', 'K', 8, 4)
     return new_graph
+
 
 def create_graph(env, statistics, sim_time):
     new_graph = NetworkGraph(env, statistics, sim_time)
